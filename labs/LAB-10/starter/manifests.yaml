@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  namespace: cka-lab10
+  labels:
+    app: app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app
+  namespace: cka-lab10
+  labels:
+    app: app
+spec:
+  type: ClusterIP
+  selector:
+    app: app
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: broken-ingress
+  namespace: cka-lab10
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: broken.lab.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app-svc-typo
+                port:
+                  number: 80

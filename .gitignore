@@ -1,0 +1,5 @@
+.DS_Store
+*.kubeconfig
+out/
+kit/
+.env

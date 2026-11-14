@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# LAB-12 reset: delete namespace cka-lab12 (and any leftover PVs bound to cka-lab12),
+# recreate cka-lab12 empty, and leave Traefik untouched.
+set -uo pipefail
+
+if [[ -z "${KUBECONFIG:-}" ]]; then
+  export KUBECONFIG=/root/.kube/config
+fi
+
+NS="cka-lab12"
+
+kubectl delete namespace "$NS" --ignore-not-found >/dev/null 2>&1 || true
+
+# Clean up any leftover PVs created for cka-lab12 in case a participant set Retain
+pvs="$(kubectl get pv -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.claimRef.namespace}{"\n"}{end}' 2>/dev/null | awk '$1 ~ /^pvc-/ && $2 == "cka-lab12" {print $1}' || true)"
+for pv in $pvs; do
+  kubectl delete pv "$pv" --ignore-not-found >/dev/null 2>&1 || true
+done
+
+kubectl create namespace "$NS" >/dev/null 2>&1 || true
+printf 'Reset complete: namespace %s recreated empty (Traefik left untouched)\n' "$NS"
+exit 0

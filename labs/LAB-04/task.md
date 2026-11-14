@@ -1,6 +1,6 @@
 # LAB-04 — Worker Join, CNI (Calico), dan Verifikasi DNS
 
-Tujuan: membuat join token di control-plane, menggabungkan kedua node worker (`cka-pN-w1` dan `cka-pN-w2`) dengan `--node-name`, memasang plugin CNI Calico dari manifest lokal `/opt/lab/manifests/calico.yaml`, serta memverifikasi resolusi DNS kluster.
+Tujuan: join worker, pasang Calico lokal, uji DNS cluster. Bukti: 3 node Ready dan nslookup sukses.
 
 ## Konteks & State Awal
 

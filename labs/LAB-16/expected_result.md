@@ -1,6 +1,6 @@
 # Expected Result — LAB-16
 
-State akhir yang dinilai oleh `verify/verify.sh` di node `cka-pN-cp`:
+State akhir yang dinilai `verify/verify.sh` di node `cka-pN-cp`:
 
 1. **Part A — CustomResourceDefinition `configforges.lab.example.com` & Validasi OpenAPI:**
    - CRD `configforges.lab.example.com` berstatus `Established=True`, memiliki `scope: Namespaced`, dan `shortNames` memuat `cfgforge`.
@@ -14,6 +14,6 @@ State akhir yang dinilai oleh `verify/verify.sh` di node `cka-pN-cp`:
    - Permintaan HTTP melalui NodePort Traefik (`http://localhost:30082/` dengan header `Host: app.lab16.local`) berhasil direkonsiliasi dan mengembalikan halaman sambutan nginx (`Welcome to nginx!`).
    - Saat `IngressRoute` dihapus, permintaan yang sama ke `http://localhost:30082/` dengan header `Host: app.lab16.local` tidak lagi mengembalikan halaman nginx melainkan kode status HTTP `404` (diverifikasi secara otomatis oleh `verify/verify.sh`, yang kemudian memulihkan kembali `IngressRoute` peserta).
 
-3. **Perilaku `reset/reset.sh` & Output Verifier:**
+3. **Perilaku `reset/reset.sh` & output verifier:**
    - Skrip `reset/reset.sh` valid dan terkonfigurasi untuk menghapus namespace `cka-lab16` serta CRD `configforges.lab.example.com`, sembari membiarkan rilis Traefik tetap terpasang.
    - Menjalankan `verify/verify.sh` mencetak 9 baris `PASS:` dan diakhiri dengan `RESULT: PASS (9/9)` serta kode keluar `0`.

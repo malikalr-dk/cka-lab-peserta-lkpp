@@ -1,7 +1,7 @@
 # Expected Result — LAB-09
 
 State akhir yang dinilai `verify/verify.sh` di node `cka-pN-cp`. Verifier bersifat **behaviour-based**:
-nama image tidak pernah di-assert, sehingga kelas boleh memakai image sendiri lewat
+nama image tidak pernah di-assert, jadi kelas boleh pakai image sendiri lewat
 `/root/lab/lab09-image.txt` (lihat `task.md` bagian BYO).
 
 1. **Deployment `demo` siap**

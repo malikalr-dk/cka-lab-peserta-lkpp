@@ -1,12 +1,12 @@
 # LAB-02 — Inspeksi Arsitektur Kluster (Read-Only)
 
-Tujuan: mengidentifikasi komponen control-plane dan worker, memeriksa kesehatan kluster, meninjau namespace serta pod sistem di `kube-system`, dan mendokumentasikan temuan ke `/root/lab/lab02-report.txt`.
+Tujuan: inspeksi node, namespace, dan pod kube-system. Bukti: laporan di `/root/lab/lab02-report.txt`.
 
 ## Konteks & State Awal
 
-- Kluster 3-node (`cka-pN-cp`, `cka-pN-w1`, `cka-pN-w2`) berada dalam keadaan sehat (`Ready`).
-- Lab ini bersifat **read-only** terhadap objek kluster Kubernetes (jangan menghapus atau mengubah node/pod sistem).
-- Anda dapat menjalankan `kubectl` dari laptop Anda maupun melalui SSH di `cka-pN-cp`, namun file laporan akhir **wajib** ditulis di node control-plane pada path `/root/lab/lab02-report.txt`.
+- Kluster 3-node (`cka-pN-cp`, `cka-pN-w1`, `cka-pN-w2`) sehat (`Ready`).
+- Lab ini **read-only** untuk objek Kubernetes: jangan hapus atau ubah node/pod sistem.
+- `kubectl` boleh dari laptopmu atau SSH ke `cka-pN-cp`; laporan akhir **wajib** di `cka-pN-cp` pada `/root/lab/lab02-report.txt`.
 
 ## Tugas
 

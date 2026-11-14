@@ -1,6 +1,6 @@
 # Expected Result — LAB-15
 
-State akhir yang dinilai oleh `verify/verify.sh` di node `cka-pN-cp`:
+State akhir yang dinilai `verify/verify.sh` di node `cka-pN-cp`:
 
 1. **CRD Gateway API & `GatewayClass`:**
    - CRD `gatewayclasses.gateway.networking.k8s.io`, `gateways.gateway.networking.k8s.io`, dan `httproutes.gateway.networking.k8s.io` tersedia dengan kondisi `Established=True`.
@@ -14,9 +14,9 @@ State akhir yang dinilai oleh `verify/verify.sh` di node `cka-pN-cp`:
    - `HTTPRoute` `web-route` di namespace `cka-lab15` melayani hostname `web.gw.local`, terhubung ke `web-gateway`, dan memiliki kondisi parent `Accepted=True` serta `ResolvedRefs=True`.
    - Permintaan HTTP `curl -s -H 'Host: web.gw.local' http://localhost:30081/` mengembalikan halaman sambutan nginx (`Welcome to nginx!`).
 
-4. **Objek `HTTPRoute` `broken-route` (Telah Diperbaiki):**
+4. **Objek `HTTPRoute` `broken-route` (sudah diperbaiki):**
    - `HTTPRoute` `broken-route` di namespace `cka-lab15` memiliki `backendRefs` yang mengarah ke `Service` `web` pada port `80`, dengan kondisi parent `Accepted=True` serta `ResolvedRefs=True`.
    - Permintaan HTTP `curl -s -H 'Host: broken.gw.local' http://localhost:30081/` mengembalikan halaman sambutan nginx (`Welcome to nginx!`).
 
-5. **Output Verifier:**
+5. **Output verifier:**
    - Menjalankan `verify/verify.sh` mencetak 9 baris `PASS:` dan diakhiri dengan `RESULT: PASS (9/9)` serta kode keluar `0`.

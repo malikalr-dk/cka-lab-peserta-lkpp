@@ -47,7 +47,7 @@ Tujuan: mendiagnosis dan memperbaiki **dua insiden kerusakan kluster** (*trainer
 
 ### Bagian 2 — Insiden 2 (Fault B): `kube-apiserver` Tidak Merespons
 
-> Minta trainer menyuntikkan **Fault B** (`bash labs/LAB-18/fault/fault.sh b`) sebelum memulai bagian ini.
+> Minta trainer menyuntikkan **Fault B** sebelum memulai bagian ini. Peserta tidak menyuntikkan fault sendiri.
 
 1. **Identifikasi Kegagalan Komponen Control Plane:**
    - Amati bahwa perintah `kubectl` gagal menghubungi API server (`The connection to the server ... was refused`).

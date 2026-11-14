@@ -43,6 +43,13 @@ bash /opt/lab/labs/LAB-02/reset/reset.sh       # ulangi dari awal
 
 Jalankan `verify.sh` dari node, bukan dari laptop. Skrip ini membaca cluster lewat `kubectl`.
 
+Dua pengecualian:
+
+- **LAB-18** (troubleshooting) tidak punya `starter/` maupun `reset/`: dua insidennya disuntikkan
+  trainer, dan skrip penyuntiknya sengaja tidak dibagikan supaya tidak membocorkan akar masalah.
+- **LAB-03** destruktif: `kubeadm reset -f` adalah bagian tugasnya. Kalau cluster tidak bisa
+  dipulihkan sendiri, minta trainer membangun ulang.
+
 ## Aturan
 
 - `kubeadm reset` **hanya** di LAB-03. Di lab lain itu menghapus clustermu sendiri.

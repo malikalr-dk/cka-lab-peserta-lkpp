@@ -8,7 +8,7 @@ if [[ -z "${KUBECONFIG:-}" ]]; then
   printf 'INFO: KUBECONFIG not set; falling back to %s\n' "$KUBECONFIG"
 fi
 
-NS="lab01"
+NS="gisp-app"
 POD_MANIFEST="/root/lab/lab01-pod.yaml"
 REPORT_FILE="/root/lab/lab01-report.txt"
 
@@ -26,7 +26,7 @@ fail() {
   printf 'FAIL: %s\n' "$*"
 }
 
-# 1. Namespace 'lab01' exists and is Active
+# 1. Namespace 'gisp-app' exists and is Active
 ns_phase="$(kubectl get namespace "$NS" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
 if [[ "$ns_phase" == "Active" ]]; then
   pass "Namespace '${NS}' exists and status.phase=${ns_phase} (expected: Active)"
@@ -34,7 +34,7 @@ else
   fail "Namespace '${NS}' status.phase='${ns_phase:-missing}' (expected: Active)"
 fi
 
-# 2. Pod 'web' is Running in namespace 'lab01' with image 'nginx:1.27-alpine'
+# 2. Pod 'web' is Running in namespace 'gisp-app' with image 'nginx:1.27-alpine'
 web_phase=""
 web_img=""
 for _ in $(seq 1 15); do
@@ -49,7 +49,7 @@ else
   fail "Pod '${NS}/web' has phase='${web_phase:-missing}', image='${web_img:-missing}' (expected: Running, nginx:1.27-alpine)"
 fi
 
-# 3. Pod 'web2' is Running in namespace 'lab01' with image 'nginx:1.29-alpine'
+# 3. Pod 'web2' is Running in namespace 'gisp-app' with image 'nginx:1.29-alpine'
 web2_phase=""
 web2_img=""
 for _ in $(seq 1 15); do

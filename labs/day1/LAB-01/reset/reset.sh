@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# LAB-01 reset: delete namespace lab01 and wait, remove /root/lab/lab01-pod.yaml and
+# LAB-01 reset: delete namespace gisp-app and wait, remove /root/lab/lab01-pod.yaml and
 # /root/lab/lab01-report.txt, and re-run the starter pre-flight. Idempotent and SSH-pipe safe.
 set -uo pipefail
 
@@ -7,7 +7,7 @@ if [[ -z "${KUBECONFIG:-}" ]]; then
   export KUBECONFIG=/root/.kube/config
 fi
 
-NS="lab01"
+NS="gisp-app"
 LAB_DIR="/root/lab"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || pwd)"
 STARTER_SCRIPT="${SCRIPT_DIR}/../starter/setup.sh"

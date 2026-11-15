@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# LAB-01 starter: ensure /root/lab exists, namespace lab01 is absent, and cached nginx images
+# LAB-01 starter: ensure /root/lab exists, namespace gisp-app is absent, and cached nginx images
 # are present in containerd via crictl images.
 set -uo pipefail
 
@@ -7,7 +7,7 @@ if [[ -z "${KUBECONFIG:-}" ]]; then
   export KUBECONFIG=/root/.kube/config
 fi
 
-NS="lab01"
+NS="gisp-app"
 LAB_DIR="/root/lab"
 
 mkdir -p "$LAB_DIR"

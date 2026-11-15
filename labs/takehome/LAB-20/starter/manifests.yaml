@@ -38,7 +38,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web
-  namespace: cka-lab16
+  namespace: cka-lab20
   labels:
     app: web
 spec:
@@ -62,7 +62,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: web
-  namespace: cka-lab16
+  namespace: cka-lab20
   labels:
     app: web
 spec:

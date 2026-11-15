@@ -7,11 +7,10 @@ Folder di sini mengikuti urutan sesi. Semua perintah dijalankan di control-plane
 | Day 1 | `labs/day1` | LAB-01, LAB-02, LAB-03, LAB-04 |
 | Day 2 | `labs/day2` | LAB-05, LAB-06, LAB-07, LAB-08 |
 | Day 3 | `labs/day3` | LAB-09, LAB-10, LAB-11, LAB-12 |
-| Day 4 | `labs/day4` | LAB-13, LAB-14, plus LAB-10 dan LAB-12 (dipakai ulang) |
-| Take-home | `labs/takehome` | LAB-15, LAB-16, LAB-17, LAB-18 |
+| Day 4 | `labs/day4` | LAB-13, LAB-14, LAB-15, LAB-16 |
+| Take-home | `labs/takehome` | LAB-17, LAB-18, LAB-19, LAB-20 |
 
-`labs/day4/LAB-10` dan `labs/day4/LAB-12` adalah symlink ke `labs/day3/`. Kalau clone di Windows
-membuatnya jadi file teks (bukan folder), pakai `labs/day3/LAB-10` dan `labs/day3/LAB-12` langsung.
+LAB-15 dan LAB-16 adalah lab asesmen Day 4, bukan pemakaian ulang lab sebelumnya.
 
 ## Path di node
 

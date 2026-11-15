@@ -1,40 +1,31 @@
 #!/usr/bin/env bash
-# LAB-17 reset: delete namespace cka-lab15 and recreate starter state (Deployment web, Service web,
-# and broken-route with port 8080). Leave Gateway API CRDs and Traefik installed.
+# LAB-17 reset: delete namespace cka-lab17 and recreate the starter state (Deployment demo,
+# Service demo, Deployment client, Pod intruder). The BYO declaration
+# /root/lab/lab17-image.txt is left untouched, so the starter re-renders the same image.
 set -uo pipefail
 
 if [[ -z "${KUBECONFIG:-}" ]]; then
   export KUBECONFIG=/root/.kube/config
 fi
 
-NS="cka-lab15"
+NS="cka-lab17"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || true)"
-STARTER_YAML="${SCRIPT_DIR}/../starter/manifests.yaml"
-# `bash -s < reset.sh` (the documented remote runner) makes BASH_SOURCE /dev/stdin, so
-# SCRIPT_DIR resolves to /dev and this script used to fail with "manifests tidak ditemukan".
-if [[ ! -f "$STARTER_YAML" ]]; then
-  STARTER_YAML="/opt/lab/labs/LAB-17/starter/manifests.yaml"
+STARTER_SETUP="${SCRIPT_DIR}/../starter/setup.sh"
+# `bash -s < reset.sh` (the documented remote runner) makes BASH_SOURCE /dev/stdin,
+# so SCRIPT_DIR resolves to /dev and the starter is silently skipped — reset would
+# delete the namespace and leave nothing behind. Fall back to the copy on the CP.
+if [[ ! -f "$STARTER_SETUP" ]]; then
+  STARTER_SETUP="/opt/lab/labs/LAB-17/starter/setup.sh"
 fi
-
-kubectl delete namespace "$NS" --ignore-not-found >/dev/null 2>&1 || true
-# A terminating namespace still answers 'create' with AlreadyExists; wait for it to be gone.
-for _ in $(seq 1 60); do
-  kubectl get namespace "$NS" >/dev/null 2>&1 || break
-  sleep 2
-done
-kubectl create namespace "$NS" >/dev/null
-
-if [[ -f "$STARTER_YAML" ]]; then
-  if ! kubectl apply -f "$STARTER_YAML" >/dev/null; then
-    printf 'FAIL: kubectl apply %s gagal — namespace %s tidak kembali ke state awal\n' "$STARTER_YAML" "$NS" >&2
-    exit 1
-  fi
-else
-  printf 'FAIL: %s tidak ditemukan — state awal LAB-17 tidak bisa dipulihkan\n' "$STARTER_YAML" >&2
+if [[ ! -f "$STARTER_SETUP" ]]; then
+  printf 'FAIL: starter/setup.sh tidak ditemukan (script_dir=%s). Jalankan reset dari folder lab.\n' \
+    "${SCRIPT_DIR:-?}" >&2
   exit 1
 fi
 
-printf 'INFO: waiting up to 45s for Deployment %s/web rollout...\n' "$NS"
-kubectl -n "$NS" rollout status deployment/web --timeout=45s >/dev/null 2>&1 || true
-printf 'Reset complete: namespace %s restored to starter state (Gateway API CRDs and Traefik kept installed)\n' "$NS"
+kubectl delete namespace "$NS" --ignore-not-found >/dev/null 2>&1 || true
+
+bash "$STARTER_SETUP" || { printf 'FAIL: starter setup for %s did not complete\n' "$NS" >&2; exit 1; }
+
+printf 'Reset complete: namespace %s recreated (Deployment demo, Service demo, client, intruder); NetworkPolicy dihapus untuk LAB-17\n' "$NS"
 exit 0

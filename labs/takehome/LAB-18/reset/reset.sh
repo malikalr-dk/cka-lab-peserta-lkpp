@@ -1,19 +1,34 @@
 #!/usr/bin/env bash
-# LAB-18 reset: delete namespace cka-lab16 and CRD configforges.lab.example.com,
-# and leave Traefik (and its CRDs) installed.
+# LAB-18 reset: delete namespace cka-lab18 and restore the starter state (Deployment/Service
+# demo, honouring /root/lab/lab18-image.txt if present). metrics-server stays in kube-system.
+# Re-running the starter is deliberate: the Deployment image comes from the BYO declaration, so
+# a second copy of that render here would drift from the one the participant actually got.
+# setup.sh already deletes the namespace and waits for termination; its exit status is ours.
 set -uo pipefail
 
 if [[ -z "${KUBECONFIG:-}" ]]; then
   export KUBECONFIG=/root/.kube/config
 fi
 
-NS="cka-lab16"
-CRD_NAME="configforges.lab.example.com"
+NS="cka-lab18"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || true)"
+SETUP="${SCRIPT_DIR}/../starter/setup.sh"
+# `bash -s < reset.sh` (the documented remote runner) makes BASH_SOURCE /dev/stdin, so
+# SCRIPT_DIR resolves to /dev and the setup below would be silently skipped. Fall back to
+# the copy on the CP.
+if [[ ! -f "$SETUP" ]]; then
+  SETUP="/opt/lab/labs/LAB-18/starter/setup.sh"
+fi
+if [[ ! -f "$SETUP" ]]; then
+  printf 'FAIL: starter/setup.sh tidak ditemukan (script_dir=%s). Jalankan reset dari folder lab.\n' \
+    "${SCRIPT_DIR:-?}" >&2
+  exit 1
+fi
 
-kubectl -n "$NS" delete configforges.lab.example.com --all --ignore-not-found >/dev/null 2>&1 || true
-kubectl -n "$NS" delete ingressroutes.traefik.io --all --ignore-not-found >/dev/null 2>&1 || true
-kubectl delete namespace "$NS" --ignore-not-found >/dev/null 2>&1 || true
-kubectl delete crd "$CRD_NAME" --ignore-not-found >/dev/null 2>&1 || true
+if ! bash "$SETUP"; then
+  printf 'FAIL: starter/setup.sh failed; namespace %s is not in the starter state\n' "$NS" >&2
+  exit 1
+fi
 
-printf 'Reset complete: deleted namespace %s and deleted CustomResourceDefinition %s (Traefik kept installed)\n' "$NS" "$CRD_NAME"
+printf 'Reset complete: namespace %s recreated with Deployment/Service demo (metrics-server kept in kube-system)\n' "$NS"
 exit 0

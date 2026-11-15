@@ -47,11 +47,11 @@ Istirahat 12.00–13.00.
 |---|---|---|
 | 13 | Kubernetes Troubleshooting | LAB-13 |
 | 14 | Helm, Kustomize, Prometheus & Grafana | LAB-14 |
-| 15 | Integrated Incident Investigation | LAB-10 lalu LAB-12 |
-| 16 | Final Recovery & Assessment | LAB-12 dari state kosong |
+| 15 | Integrated Incident Investigation | LAB-15 |
+| 16 | Final Recovery & Assessment | LAB-16 |
 
-Sesi 15 dan 16 memakai lab yang sudah pernah dikerjakan. State awalnya disiapkan ulang sebelum sesi
-dimulai, jadi jangan mengandalkan sisa pekerjaan sesi sebelumnya.
+Sesi 15 dan 16 adalah asesmen individual. Keduanya memakai lab sendiri (LAB-15 dan LAB-16), dan
+state awalnya disiapkan ulang sebelum sesi dimulai.
 
 ## Lab mandiri
 
@@ -59,12 +59,12 @@ Empat lab terakhir tidak masuk jam kelas. Kerjakan di luar sesi, sendiri atau be
 
 | Lab | Topik |
 |---|---|
-| LAB-15 | NetworkPolicy: default-deny dan allow-list |
-| LAB-16 | HPA dengan metrics-server: scale-out dan scale-in |
-| LAB-17 | Gateway API: GatewayClass, Gateway, HTTPRoute |
-| LAB-18 | CRD dan operator: validasi skema, rekonsiliasi |
+| LAB-17 | NetworkPolicy: default-deny dan allow-list |
+| LAB-18 | HPA dengan metrics-server: scale-out dan scale-in |
+| LAB-19 | Gateway API: GatewayClass, Gateway, HTTPRoute |
+| LAB-20 | CRD dan operator: validasi skema, rekonsiliasi |
 
-LAB-17 dan LAB-18 memakai satu rilis Traefik dengan NodePort berbeda. Kerjakan berurutan, dan minta
+LAB-19 dan LAB-20 memakai satu rilis Traefik dengan NodePort berbeda. Kerjakan berurutan, dan minta
 trainer menyiapkan ulang state lab yang lebih dulu kalau kamu mau mengulang.
 
 ## Cara mengerjakan satu lab

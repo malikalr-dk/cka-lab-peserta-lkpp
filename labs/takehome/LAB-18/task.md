@@ -1,39 +1,170 @@
-# LAB-18 — CustomResourceDefinition (`ConfigForge`) dan Operator Berbasis CRD (Traefik `IngressRoute`)
+# LAB-18 — HorizontalPodAutoscaler (HPA) dengan metrics-server
 
-Tujuan: uji validasi CRD `ConfigForge`, deploy `IngressRoute` Traefik; buktikan HTTP lolos, hapus, lalu apply lagi sebelum verify.
+Tujuan: bikin HPA `demo` (CPU 50%), buktikan scale-out saat dibebani dan scale-in setelah beban berhenti.
 
 ## Konteks & State Awal
 
-- Starter sudah siapkan objek berikut:
-  - **Part A — CRD `ConfigForge`:**
-    - `CustomResourceDefinition` bernama `configforges.lab.example.com`:
-      - `group`: `lab.example.com`, `version`: `v1`, `kind`: `ConfigForge`, `shortNames`: `cfgforge`, `scope`: `Namespaced`
-      - Skema OpenAPI v3: mewajibkan field `spec.data` bertipe `string` dengan aturan validasi panjang karakter `minLength: 1` dan `maxLength: 40`.
-  - **Part B — Operator Traefik & Workload `web`:**
-    - Rilis Helm **Traefik** di namespace `traefik` (dari chart lokal `/opt/lab/charts/traefik-42.4.0.tgz`) dikonfigurasi dengan provider Kubernetes CRD aktif (`providers.kubernetesCRD.enabled=true`) dan diekspos melalui `Service` bertipe `NodePort` pada port `80` -> NodePort `30082`.
-    - CRD Traefik `ingressroutes.traefik.io` (`apiVersion: traefik.io/v1alpha1`, `kind: IngressRoute`) sudah terdaftar dan berstatus `Established=True`.
-    - Namespace `cka-lab16` berisi `Deployment` bernama `web` (`nginx:1.27-alpine`, `1` replika, `imagePullPolicy: IfNotPresent`) dan `Service` bernama `web` pada port `80`.
-- Saat starter selesai dijalankan, **belum ada** objek `ConfigForge` maupun `IngressRoute` di namespace `cka-lab16`.
-- **Perilaku `reset/reset.sh`:** skrip reset menghapus namespace `cka-lab16` beserta CRD `configforges.lab.example.com`, dan membiarkan rilis Traefik tetap terpasang di namespace `traefik`.
+- Starter sudah pasang `metrics-server` di namespace `kube-system` dari
+  `/opt/lab/manifests/metrics-server.yaml` (flag `--kubelet-insecure-tls` untuk sertifikat kubelet
+  `kubeadm`) dan memastikan `kubectl top nodes` serta `kubectl -n cka-lab18 top pods` sudah merespons.
+- Namespace `cka-lab18` sudah disiapkan starter beserta:
+  - `Deployment` bernama `demo` (`docker.io/stefanprodan/podinfo:6.7.1`, `1` replika,
+    `containerPort: 9898`, `resources.requests.cpu: 100m`, `imagePullPolicy: IfNotPresent`).
+  - `Service` bernama `demo` bertipe `ClusterIP` pada port `9898` → `9898`, selector `app: demo`.
+- **Penting:** HPA hanya bisa hitung persentase utilisasi kalau Pod target punya
+  `resources.requests.cpu`. Jangan hapus atau ubah `requests.cpu: 100m` pada `Deployment`
+  `demo`. Angka itulah penyebut perhitungannya.
+- Generator beban dijalankan sebagai Pod dengan `--restart=Never` (bukan sesi interaktif) agar tidak
+  menggantung pada sesi non-TTY.
 
 ## Tugas
 
-1. **Part A: inspeksi skema CRD dan uji `ConfigForge`:**
-   - Periksa status CRD `configforges.lab.example.com` (`kubectl get crd configforges.lab.example.com`) dan pastikan kondisinya `Established=True`.
-   - Gunakan `kubectl explain configforge.spec` untuk memeriksa dokumentasi skema OpenAPI v3 pada field `spec.data` beserta batas panjang karakternya (`maxLength: 40`).
-   - Buktikan validasi skema OpenAPI v3 bekerja dengan mencoba menerapkan objek `ConfigForge` yang **tidak valid** (misalnya memiliki `spec.data` lebih dari `40` karakter) dan amati bahwa API server **menolak** objek tersebut.
-   - Buat objek `ConfigForge` yang **valid** (`apiVersion: lab.example.com/v1`, `kind: ConfigForge`) bernama `app-cfg` di namespace `cka-lab16` dengan `spec.data` yang tidak melebihi `40` karakter (misalnya `"mode=production"`), lalu pastikan objek tersebut tersimpan dan dapat dibaca dengan `kubectl -n cka-lab16 get cfgforge app-cfg`.
+### 1. Cek metrics API dan buat HPA `demo`
 
-2. **Part B: bikin `IngressRoute` dan buktikan rekonsiliasi:**
-   - Pastikan CRD `ingressroutes.traefik.io` tersedia dan `Deployment` `traefik` di namespace `traefik` berstatus `Available`.
-   - Buat *Custom Resource* `IngressRoute` (`apiVersion: traefik.io/v1alpha1`, `kind: IngressRoute`) bernama `app-route` di namespace `cka-lab16` yang:
-     - Menggunakan `entryPoints: ["web"]`.
-     - Memiliki aturan rute (`spec.routes`) dengan `kind: Rule` dan `match: Host(\`app.lab16.local\`)`.
-     - Meneruskan trafik ke `services` bernama `web` pada `port: 80`.
-   - Buktikan operator Traefik merekonsiliasi `IngressRoute` tersebut dengan mengirim permintaan HTTP ke NodePort `30082` menggunakan header `Host: app.lab16.local`:
-     `curl -s -H 'Host: app.lab16.local' http://localhost:30082/`
-     Pastikan respons mengembalikan halaman sambutan nginx (`Welcome to nginx!`).
+- Pastikan metrik Pod terbaca di namespace ini:
 
-3. **Part B lanjutan: hapus rute, pulihkan, siap verify:**
-   - Hapus `IngressRoute` `app-route` (`kubectl -n cka-lab16 delete ingressroute app-route`) dan buktikan bahwa permintaan `curl -i -H 'Host: app.lab16.local' http://localhost:30082/` kini mengembalikan `404 page not found` karena Traefik sudah hapus rute itu dari konfigurasi aktif.
-   - Terapkan kembali (`kubectl apply`) `IngressRoute` `app-route` di namespace `cka-lab16` dan pastikan `curl -s -H 'Host: app.lab16.local' http://localhost:30082/` kembali mengembalikan halaman sambutan nginx sebelum menjalankan `verify/verify.sh`.
+  ```bash
+  kubectl -n cka-lab18 top pods
+  ```
+
+- Buat `HorizontalPodAutoscaler` bernama `demo` yang menargetkan `Deployment/demo`:
+
+  ```bash
+  kubectl -n cka-lab18 autoscale deployment demo --cpu=50% --min=1 --max=4
+  ```
+
+  Parameter yang dinilai: `minReplicas: 1`, `maxReplicas: 4`, target utilisasi CPU rata-rata `50%`.
+
+### 2. Picu scale-out dengan beban HTTP sintetis
+
+- Jalankan Pod generator beban `load-generator` (`busybox:1.37`, `--restart=Never`) yang menembak
+  `Service` `demo` dengan **4 loop `wget` paralel**:
+
+  ```bash
+  kubectl -n cka-lab18 run load-generator \
+    --image=busybox:1.37 \
+    --image-pull-policy=IfNotPresent \
+    --restart=Never \
+    --command -- sh -c 'for i in 1 2 3 4; do (while true; do wget -q -O- http://demo.cka-lab18.svc.cluster.local:9898/ >/dev/null 2>&1; done) & done; wait'
+  ```
+
+- Satu loop `wget` berurutan hanya membakar sekitar `68m` dari `requests.cpu: 100m`. Terlalu dekat
+  dengan ambang `50%`, sehingga HPA berayun `1 ↔ 2` dan scale-out tidak pernah stabil. Empat loop
+  paralel menghasilkan sekitar `110–130m` (≈ `110–130%`).
+- Pantau perkembangan replika selama kurang lebih `45–120` detik:
+
+  ```bash
+  kubectl -n cka-lab18 get hpa demo
+  kubectl -n cka-lab18 get deploy demo
+  ```
+
+  Scale-out dianggap tercapai saat `READY`/`readyReplicas` pada `Deployment` `demo` menjadi `> 1`.
+
+### 3. Perpendek jendela scale-down, hentikan beban, amati scale-in
+
+- Jendela stabilisasi scale-down default adalah `300` detik. Terlalu lama untuk latihan dan untuk
+  verifier. **Wajib** perpendek lebih dulu:
+
+  ```bash
+  kubectl -n cka-lab18 patch hpa demo --type='merge' \
+    -p '{"spec":{"behavior":{"scaleDown":{"stabilizationWindowSeconds":10}}}}'
+  ```
+
+- Setelah scale-out terbukti (tercatat pada `status.lastScaleTime` dan event `SuccessfulRescale`),
+  hapus Pod generator beban:
+
+  ```bash
+  kubectl -n cka-lab18 delete pod load-generator --wait=false
+  ```
+
+- Pantau penurunan utilisasi CPU pada HPA hingga di bawah `50%` dan replika menyusut kembali ke
+  batas minimum (`1`):
+
+  ```bash
+  kubectl -n cka-lab18 get hpa demo -w
+  ```
+
+## Apa yang diverifikasi
+
+```bash
+bash labs/LAB-18/verify/verify.sh
+```
+
+Verifier mencetak satu baris `PASS:`/`FAIL:` per assertion dan diakhiri `RESULT: PASS (5/5)` atau
+`RESULT: FAIL (n/5)`. Lima assertion, semuanya berbasis perilaku:
+
+1. **Metrics API merespons:** `kubectl top nodes` atau `kubectl -n cka-lab18 top pods` mengembalikan
+   baris metrik (retry berbatas 60 detik).
+2. **`Deployment` `demo` Ready** dan container-nya punya `resources.requests.cpu` terisi (nilainya
+   tidak dikunci, field-nya wajib ada).
+3. **`HorizontalPodAutoscaler` `demo`** ada, menargetkan `Deployment/demo`, `minReplicas: 1`,
+   `maxReplicas: 4`, target CPU rata-rata `50%`.
+4. **Scale-out:** di bawah beban 4 loop `wget` paralel yang dijalankan verifier sendiri
+   (`lab18-verify-load`), `status.readyReplicas` pada `Deployment` `demo` menjadi `> 1` dalam jendela
+   **180 detik**.
+5. **Scale-in:** setelah verifier menghapus Pod beban (`lab18-verify-load` **dan** `load-generator`
+   peserta, kalau masih ada), `readyReplicas` kembali ke `1` dalam jendela **120 detik**. Jendela
+   ini hanya tercapai kalau `behavior.scaleDown.stabilizationWindowSeconds: 10` sudah dipasang pada
+   langkah 3.
+
+Verifier tidak mengunci nama image; image hanya dicetak sebagai `INFO`. Pod `load-generator` peserta
+tidak wajib dihapus sebelum verifikasi; verifier menghapusnya sendiri pada assertion scale-in.
+
+## Batasan
+
+- Semua langkah dikerjakan dengan `kubectl`. Tidak ada dashboard, `k9s`, atau editor GUI.
+- Jangan ubah `metrics-server` di `kube-system`, jangan tambah `--kubelet-insecure-tls` ulang,
+  dan jangan sentuh Pod `kube-system` lain.
+- Jangan hapus `resources.requests.cpu` dari `Deployment` `demo`; tanpa field itu HPA tidak bisa
+  menghitung persentase dan assertion 2 gagal.
+- `minReplicas`/`maxReplicas`/target CPU harus tepat `1`/`4`/`50%`. HPA dengan nilai lain dinilai
+  salah walaupun scaling-nya berjalan.
+- Node tidak punya akses registry: jangan ubah image `Deployment` ke tag yang tidak ada di cache
+  node, karena Pod akan `ImagePullBackOff` dan lab tidak bisa dilanjutkan.
+- Generator beban harus Pod `--restart=Never`; `kubectl run -it`/`exec` interaktif menggantung pada
+  sesi non-TTY.
+
+## Memakai image sendiri (BYO)
+
+Image aplikasi internal boleh dipakai sebagai pengganti `podinfo`. Verifier menilai **perilaku**
+(HPA menargetkan Deployment, `requests.cpu` ada, replika naik saat dibebani lalu turun saat beban
+hilang), bukan nama image.
+
+**Format deklarasi** di node control-plane, sebelum starter dijalankan:
+
+```text
+/root/lab/lab18-image.txt
+image=<registry>/<nama>:<tag>
+port=<port>
+path=<endpoint yang dibebani>
+```
+
+Kalau file ini tidak ada, starter memakai `docker.io/stefanprodan/podinfo:6.7.1`, port `9898`, path `/`.
+
+Syarat:
+
+1. **Tag ter-pin, bukan `latest`.** Starter menolak image tanpa tag atau `:latest` dengan pesan
+   `(expected: <registry>/<name>:<tag> with a pinned version, e.g. :1.2.3)`.
+2. **Port valid `1–65535`.** Starter menolak `port=` yang bukan angka atau di luar rentang dengan
+   pesan `(expected: 1-65535)`.
+3. Aplikasi listen HTTP pada `port=` yang dideklarasikan; `Service` `demo` memakai port yang sama.
+4. **Image bisa ditarik dari registry:** image default sudah ada di golden image, image BYO ditarik
+   saat pod pertama dibuat. Daftar image dan aturan tag ada di `docs/lab-images.md`.
+5. **Endpoint di `path=` harus membakar CPU.** Kalau `path=` menunjuk endpoint murah (mis. `/healthz`
+   yang hanya mengembalikan `200 OK`), utilisasi tidak akan melewati `50%` walaupun 4 loop berjalan,
+   dan assertion scale-out gagal. Pilih endpoint yang melakukan kerja nyata (query, render, hitung).
+   Untuk `podinfo` cukup `/`.
+6. Kalau aplikasi butuh `requests.cpu` berbeda dari `100m`, sesuaikan Deployment **dan** ambang
+   HPA tetap `50%`; verifier tidak mengunci nilai request, hanya mewajibkan field itu terisi.
+
+Contoh:
+
+```bash
+mkdir -p /root/lab
+cat > /root/lab/lab18-image.txt <<'EOF'
+image=registry.internal/portal-api:1.4.2
+port=8080
+path=/api/report
+EOF
+bash labs/LAB-18/starter/setup.sh
+```

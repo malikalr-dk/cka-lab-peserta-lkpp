@@ -1,200 +1,170 @@
 #!/usr/bin/env bash
-# LAB-17 starter: apply Gateway API CRDs (/opt/lab/manifests/gateway-api.yaml),
-# install/upgrade Traefik from /opt/lab/charts/traefik-42.4.0.tgz with Gateway API provider enabled,
-# and create namespace cka-lab15 with Deployment web, Service web, and a broken HTTPRoute (broken-route).
+# LAB-17 starter: namespace cka-lab17 with Deployment demo (podinfo by default, or the
+# participant's BYO image), Service demo, Deployment client (role=client), Pod intruder
+# (role=intruder). Manifests are rendered here instead of living in a static file so the
+# image/port/path declared in /root/lab/lab17-image.txt cannot contradict them.
 set -uo pipefail
 
 if [[ -z "${KUBECONFIG:-}" ]]; then
   export KUBECONFIG=/root/.kube/config
 fi
 
-NS="cka-lab15"
-TRAEFIK_NS="traefik"
-GW_MANIFEST="/opt/lab/manifests/gateway-api.yaml"
-CHART="/opt/lab/charts/traefik-42.4.0.tgz"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+NS="cka-lab17"
+DECL="/root/lab/lab17-image.txt"
+DEFAULT_IMAGE="docker.io/stefanprodan/podinfo:6.7.1"
+DEFAULT_PORT="9898"
+DEFAULT_PATH="/healthz"
 
-if [[ -f "$GW_MANIFEST" ]]; then
-  printf 'INFO: applying Gateway API CRDs from %s...\n' "$GW_MANIFEST"
-  kubectl apply -f "$GW_MANIFEST" >/dev/null 2>&1 || true
+# Last occurrence of the key wins; tolerant of CRLF and padding around '='.
+decl_get() {
+  [[ -f "$DECL" ]] || return 1
+  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$DECL" |
+    tail -n 1 | tr -d '\r' | sed 's/[[:space:]]*$//'
+}
+
+IMAGE="$DEFAULT_IMAGE"
+PORT="$DEFAULT_PORT"
+PROBE_PATH="$DEFAULT_PATH"
+SOURCE="default"
+if [[ -f "$DECL" ]]; then
+  SOURCE="$DECL"
+  v="$(decl_get image || true)"; [[ -n "${v:-}" ]] && IMAGE="$v"
+  v="$(decl_get port || true)";  [[ -n "${v:-}" ]] && PORT="$v"
+  v="$(decl_get path || true)";  [[ -n "${v:-}" ]] && PROBE_PATH="$v"
 fi
 
-printf 'INFO: waiting up to 30s for Gateway API CRDs to be Established...\n'
-crd_ok=0
-for _ in $(seq 1 15); do
-  crd_ok=1
-  for crd in gatewayclasses gateways httproutes; do
-    crd_cond="$(kubectl get crd "${crd}.gateway.networking.k8s.io" -o jsonpath='{range .status.conditions[*]}{.type}={.status} {end}' 2>/dev/null || true)"
-    [[ "$crd_cond" == *"Established=True"* ]] || crd_ok=0
-  done
-  [[ "$crd_ok" -eq 1 ]] && break
-  crd_ok=0
-  sleep 2
-done
-if [[ "$crd_ok" -ne 1 ]]; then
-  printf 'FAIL: Gateway API CRDs (gatewayclasses, gateways, httproutes) not Established=True after 30s — source %s\n' "$GW_MANIFEST" >&2
+if ! [[ "$PORT" =~ ^[0-9]+$ ]] || (( PORT < 1 || PORT > 65535 )); then
+  printf 'FAIL: port=%s dari %s bukan port TCP yang sah (expected: 1..65535)\n' "$PORT" "$SOURCE" >&2
+  exit 1
+fi
+last_seg="${IMAGE##*/}"
+if [[ "$last_seg" != *:* ]]; then
+  printf 'FAIL: image=%s tidak punya tag; tag wajib di-pin (expected: <image>:<tag>, bukan latest)\n' "$IMAGE" >&2
+  exit 1
+fi
+if [[ "$last_seg" == *:latest ]]; then
+  printf 'FAIL: image=%s memakai tag latest; tag wajib di-pin (expected: <image>:<tag>, bukan latest)\n' "$IMAGE" >&2
+  exit 1
+fi
+if [[ "$PROBE_PATH" != /* ]]; then
+  printf 'FAIL: path=%s dari %s harus dimulai dengan / (expected: /healthz)\n' "$PROBE_PATH" "$SOURCE" >&2
   exit 1
 fi
 
-printf 'INFO: installing/updating Traefik with Gateway API provider enabled in namespace %s...\n' "$TRAEFIK_NS"
-# A NodePort Service has no loadbalancer.status, so statusAddress.service alone leaves Gateway
-# status.addresses empty and the participant's "wait for an address" step never completes.
-# Advertise the node IP the NodePort is reachable on instead.
-NODE_IP="$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)"
-GW_STATUS_ARGS=()
-[[ -n "$NODE_IP" ]] && GW_STATUS_ARGS=(--set "providers.kubernetesGateway.statusAddress.ip=${NODE_IP}")
-
-HELM_LOG="$(mktemp)"
-if ! helm upgrade --install traefik "$CHART" \
-  -n "$TRAEFIK_NS" --create-namespace \
-  --set image.pullPolicy=IfNotPresent \
-  --set service.spec.type=NodePort \
-  --set ports.web.nodePort=30081 \
-  --set ports.web.port=80 \
-  --set ports.web.exposedPort=80 \
-  --set providers.kubernetesIngress.enabled=true \
-  --set ingressClass.enabled=true \
-  --set ingressClass.isDefaultClass=true \
-  --set providers.kubernetesGateway.enabled=true \
-  --set providers.kubernetesGateway.statusAddress.service.enabled=true \
-  ${GW_STATUS_ARGS[@]+"${GW_STATUS_ARGS[@]}"} \
-  --set gateway.enabled=false \
-  --set gatewayClass.enabled=true >"$HELM_LOG" 2>&1; then
-  printf 'FAIL: helm upgrade Traefik gagal (chart %s) — keluaran helm:\n' "$CHART" >&2
-  tail -20 "$HELM_LOG" >&2
-  rm -f "$HELM_LOG"
-  exit 1
-fi
-rm -f "$HELM_LOG"
-
-# Ensure Traefik ClusterRole grants read/status access to gateway.networking.k8s.io in case chart defaults omit a verb
-cat <<'EOF' | kubectl apply -f - >/dev/null 2>&1 || true
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: traefik-gateway-api-extra
-rules:
-  - apiGroups: ["gateway.networking.k8s.io"]
-    resources: ["gatewayclasses", "gateways", "httproutes", "referencegrants", "tcproutes", "tlsroutes", "grpcroutes"]
-    verbs: ["get", "list", "watch"]
-  - apiGroups: ["gateway.networking.k8s.io"]
-    resources: ["gatewayclasses/status", "gateways/status", "httproutes/status", "tcproutes/status", "tlsroutes/status", "grpcroutes/status"]
-    verbs: ["update", "patch"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: traefik-gateway-api-extra
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: traefik-gateway-api-extra
-subjects:
-  - kind: ServiceAccount
-    name: traefik
-    namespace: traefik
-EOF
-
-# Ensure GatewayClass 'traefik' exists so participants can bind a Gateway with gatewayClassName: traefik
-if ! kubectl get gatewayclass traefik >/dev/null 2>&1; then
-  cat <<'EOF' | kubectl apply -f - >/dev/null 2>&1 || true
-apiVersion: gateway.networking.k8s.io/v1
-kind: GatewayClass
-metadata:
-  name: traefik
-spec:
-  controllerName: traefik.io/gateway-controller
-EOF
-fi
-
-printf 'INFO: waiting up to 120s for Traefik deployment in namespace %s...\n' "$TRAEFIK_NS"
-if ! kubectl -n "$TRAEFIK_NS" rollout status deployment/traefik --timeout=120s >/dev/null 2>&1; then
-  printf 'FAIL: Deployment %s/traefik not ready after 120s — the Gateway API provider cannot program Gateways\n' "$TRAEFIK_NS" >&2
-  kubectl -n "$TRAEFIK_NS" get pods >&2 || true
-  exit 1
-fi
+printf 'INFO: LAB-17 source=%s image=%s port=%s path=%s\n' \
+  "$SOURCE" "$IMAGE" "$PORT" "$PROBE_PATH"
 
 kubectl delete namespace "$NS" --ignore-not-found >/dev/null 2>&1 || true
-# A terminating namespace still answers 'create' with AlreadyExists; wait until it is gone or the
-# apply below lands in a namespace that is about to disappear (starter state lost, READY printed).
+# A terminating namespace still answers 'create' with AlreadyExists; wait until it is
+# really gone or the apply below lands in a namespace that is about to disappear.
 for _ in $(seq 1 60); do
   kubectl get namespace "$NS" >/dev/null 2>&1 || break
   sleep 2
 done
 kubectl create namespace "$NS" >/dev/null
 
-if [[ -f "${SCRIPT_DIR}/manifests.yaml" ]]; then
-  if ! kubectl apply -f "${SCRIPT_DIR}/manifests.yaml" >/dev/null; then
-    printf 'FAIL: kubectl apply %s/manifests.yaml gagal — namespace %s tidak berada di state awal\n' "$SCRIPT_DIR" "$NS" >&2
-    exit 1
-  fi
-else
-  cat <<'EOF' | kubectl apply -f - >/dev/null
+cat <<EOF | kubectl apply -f - >/dev/null
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: web
-  namespace: cka-lab15
+  name: demo
+  namespace: ${NS}
   labels:
-    app: web
+    app: demo
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: web
+      app: demo
   template:
     metadata:
       labels:
-        app: web
+        app: demo
     spec:
       containers:
-        - name: nginx
-          image: nginx:1.27-alpine
+        - name: demo
+          image: ${IMAGE}
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 80
+            - name: http
+              containerPort: ${PORT}
+          readinessProbe:
+            httpGet:
+              path: ${PROBE_PATH}
+              port: ${PORT}
+            initialDelaySeconds: 1
+            periodSeconds: 3
+            failureThreshold: 5
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: web
-  namespace: cka-lab15
+  name: demo
+  namespace: ${NS}
   labels:
-    app: web
+    app: demo
 spec:
   type: ClusterIP
   selector:
-    app: web
+    app: demo
   ports:
     - name: http
-      port: 80
-      targetPort: 80
+      port: ${PORT}
+      targetPort: ${PORT}
 ---
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: broken-route
-  namespace: cka-lab15
+  name: client
+  namespace: ${NS}
+  labels:
+    role: client
 spec:
-  parentRefs:
-    - name: web-gateway
-  hostnames:
-    - "broken.gw.local"
-  rules:
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /
-      backendRefs:
-        - name: web
-          port: 8080
+  replicas: 1
+  selector:
+    matchLabels:
+      role: client
+  template:
+    metadata:
+      labels:
+        role: client
+    spec:
+      containers:
+        - name: busybox
+          image: busybox:1.37
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "sleep 3600"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: intruder
+  namespace: ${NS}
+  labels:
+    role: intruder
+spec:
+  containers:
+    - name: busybox
+      image: busybox:1.37
+      imagePullPolicy: IfNotPresent
+      command: ["sh", "-c", "sleep 3600"]
 EOF
-fi
 
-printf 'INFO: waiting up to 90s for Deployment %s/web rollout...\n' "$NS"
-if ! kubectl -n "$NS" rollout status deployment/web --timeout=90s >/dev/null 2>&1; then
-  printf 'FAIL: Deployment %s/web not ready after 90s (image nginx:1.27-alpine, replicas 2)\n' "$NS" >&2
-  kubectl -n "$NS" get pods >&2 || true
+printf 'INFO: waiting up to 90s for deployment/demo (readiness probe %s on port %s)...\n' \
+  "$PROBE_PATH" "$PORT"
+kubectl -n "$NS" rollout status deployment/demo --timeout=90s >/dev/null 2>&1 || true
+kubectl -n "$NS" rollout status deployment/client --timeout=45s >/dev/null 2>&1 || true
+kubectl -n "$NS" wait --for=condition=Ready pod/intruder --timeout=45s >/dev/null 2>&1 || true
+
+ready_demo="$(kubectl -n "$NS" get deployment demo -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+ready_client="$(kubectl -n "$NS" get deployment client -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+intruder_phase="$(kubectl -n "$NS" get pod intruder -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+if [[ "${ready_demo:-0}" -lt 1 || "${ready_client:-0}" -lt 1 || "${intruder_phase:-}" != "Running" ]]; then
+  printf 'FAIL: starter workloads not Ready in %s (demo=%s client=%s intruder=%s) — image %s belum ada di cache node, atau aplikasi tidak menjawab %s di port %s\n' \
+    "$NS" "${ready_demo:-0}" "${ready_client:-0}" "${intruder_phase:-missing}" \
+    "$IMAGE" "$PROBE_PATH" "$PORT" >&2
+  kubectl -n "$NS" get pods -o wide >&2 || true
   exit 1
 fi
-printf 'READY: Gateway API CRDs, Traefik Gateway provider, and namespace %s initialized for LAB-17\n' "$NS"
+printf 'READY: namespace %s initialized (image=%s, port=%s, probe=%s) with demo, client, intruder for LAB-17\n' \
+  "$NS" "$IMAGE" "$PORT" "$PROBE_PATH"

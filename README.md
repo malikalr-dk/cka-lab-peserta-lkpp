@@ -20,7 +20,7 @@ firewall). Kalau koneksi ditolak, kirim IP publik laptopmu ke trainer.
 ## Materi lab ada di node
 
 ```bash
-ls /opt/lab/labs                 # LAB-01 .. LAB-18
+ls /opt/lab/labs                 # LAB-01 .. LAB-20
 cd /opt/lab/labs/LAB-02
 cat task.md                      # tugas yang dikerjakan
 ```
@@ -33,7 +33,7 @@ Folder lab di repo ini dibagi per hari, mengikuti urutan sesi:
 | Day 2 | `labs/day2` | LAB-05..08 |
 | Day 3 | `labs/day3` | LAB-09..12 |
 | Day 4 | `labs/day4` | LAB-13, LAB-14 (+ symlink LAB-10 dan LAB-12) |
-| Take-home | `labs/takehome` | LAB-15..18 |
+| Take-home | `labs/takehome` | LAB-17..18 |
 
 Di node semua lab tetap di `/opt/lab/labs/LAB-NN` (tanpa folder hari). Isi tiap folder lab sama
 dengan yang ada di node:
@@ -85,7 +85,7 @@ sebelum sesi pertama, lalu cek lagi di hari yang lab-nya disebut.
 ## Peta sesi
 
 `docs/peta-lab.md` memuat jadwal 16 sesi, lab yang dipakai tiap sesi, empat lab mandiri
-(LAB-15..18), dan cara menilai pekerjaan sendiri dengan `verify.sh`.
+(LAB-17..18), dan cara menilai pekerjaan sendiri dengan `verify.sh`.
 
 ## kubectl dari laptop (opsional)
 

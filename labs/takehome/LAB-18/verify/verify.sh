@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# LAB-18 verifier:
-# Part A: CRD configforges.lab.example.com, kubectl explain, OpenAPI validation (invalid rejected, valid accepted)
-# Part B: Traefik CRD operator (ingressroutes.traefik.io, IngressRoute app-route -> web for app.lab16.local,
-#         HTTP 200 nginx response via NodePort 30082, and 404 after deleting IngressRoute), plus reset.sh check.
+# LAB-18 verifier: HPA 'demo' targets Deployment/demo at 50% CPU, proven by a real scale-out and
+# a real scale-in. Behaviour-based on purpose — the image name is never asserted, so a BYO image
+# (/root/lab/lab18-image.txt) passes the same checks; the image is printed as INFO only.
+# Every async step is a bounded retry: HPA scale-out needs one metrics window plus a scale
+# decision, and a single-shot check is a guaranteed false FAIL.
 # Deliberately not 'set -e': a failing assertion must print, not abort.
 set -uo pipefail
 
@@ -11,29 +12,25 @@ if [[ -z "${KUBECONFIG:-}" ]]; then
   printf 'INFO: KUBECONFIG not set; falling back to %s\n' "$KUBECONFIG"
 fi
 
-NS="cka-lab16"
-TRAEFIK_NS="traefik"
-CRD_NAME="configforges.lab.example.com"
-TRAEFIK_CRD="ingressroutes.traefik.io"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || true)"
-RESET_SCRIPT="${SCRIPT_DIR}/../reset/reset.sh"
-# `bash -s < verify.sh` (the documented remote runner) makes BASH_SOURCE /dev/stdin, so
-# SCRIPT_DIR resolves to /dev and the reset.sh sanity check below failed for the wrong reason.
-if [[ ! -f "$RESET_SCRIPT" ]]; then
-  RESET_SCRIPT="/opt/lab/labs/LAB-18/reset/reset.sh"
-fi
-IR_BACKUP="$(mktemp /tmp/lab16-ir-backup.XXXXXX.yaml 2>/dev/null || echo /tmp/lab16-ir-backup.yaml)"
+NS="cka-lab18"
+DECL="/root/lab/lab18-image.txt"
+DEF_PORT="9898"
+DEF_PATH="/"
 
-# Polls are only useful while the object exists. In starter state nothing is there to wait for,
-# and multiple 30s retry loops would turn a clear FAIL into a multi-minute silence.
-ptries() { kubectl "$@" >/dev/null 2>&1 && echo 15 || echo 1; }
+# Generous on purpose: default HPA scale-up after a fresh load pod is 30-90s on this cluster,
+# but a cold metrics-server can take a full 60s window before the HPA sees any number at all.
+SCALE_WINDOW_SECONDS=180
+# Scale-in is asserted because the task makes behavior.scaleDown.stabilizationWindowSeconds=10
+# mandatory; with that patch the drop lands in ~30-60s. The default 300s window is why the
+# patch is required rather than optional.
+SCALE_IN_WINDOW_SECONDS=120
+SCALE_POLL_INTERVAL=3
+READY_WINDOW_SECONDS=60
+VERIFY_LOAD_POD="lab18-verify-load"
+PARTICIPANT_LOAD_POD="load-generator"
 
 cleanup() {
-  kubectl -n "$NS" delete configforge invalid-probe --ignore-not-found >/dev/null 2>&1 || true
-  if [[ -s "$IR_BACKUP" ]]; then
-    kubectl apply -f "$IR_BACKUP" >/dev/null 2>&1 || true
-  fi
-  rm -f "$IR_BACKUP" >/dev/null 2>&1 || true
+  kubectl -n "$NS" delete pod "$VERIFY_LOAD_POD" --ignore-not-found --wait=false >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -51,185 +48,232 @@ fail() {
   printf 'FAIL: %s\n' "$*"
 }
 
-# 1. CRD 'configforges.lab.example.com' Established=True, scope Namespaced, shortName cfgforge
-crd_cond=""
-crd_scope=""
-crd_short=""
-for _ in $(seq 1 "$(ptries get crd "$CRD_NAME")"); do
-  crd_cond="$(kubectl get crd "$CRD_NAME" -o jsonpath='{range .status.conditions[*]}{.type}={.status} {end}' 2>/dev/null || true)"
-  crd_scope="$(kubectl get crd "$CRD_NAME" -o jsonpath='{.spec.scope}' 2>/dev/null || true)"
-  crd_short="$(kubectl get crd "$CRD_NAME" -o jsonpath='{.spec.names.shortNames[*]}' 2>/dev/null || true)"
-  [[ "$crd_cond" == *"Established=True"* ]] && break
-  sleep 2
-done
-if [[ "$crd_cond" == *"Established=True"* && "$crd_scope" == "Namespaced" && "$crd_short" == *"cfgforge"* ]]; then
-  pass "CRD '${CRD_NAME}' has Established=True, scope=${crd_scope}, shortName=${crd_short} (expected: Established=True, Namespaced, cfgforge)"
-else
-  fail "CRD '${CRD_NAME}' has conditions='${crd_cond:-missing}', scope='${crd_scope:-missing}', shortName='${crd_short:-missing}' (expected: Established=True, Namespaced, cfgforge)"
-fi
+trim() {
+  local s="${1:-}"
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+  printf '%s' "$s"
+}
 
-# 2. 'kubectl explain configforge.spec' succeeds and lists field 'data'
-explain_out="$(kubectl explain configforge.spec 2>/dev/null || true)"
-if printf '%s\n' "$explain_out" | grep -q 'FIELDS:' && printf '%s\n' "$explain_out" | grep -q 'data'; then
-  pass "'kubectl explain configforge.spec' succeeded and lists field 'data' (expected: OpenAPI schema listing 'data')"
-else
-  fail "'kubectl explain configforge.spec' failed or did not list 'data' field (expected: OpenAPI schema listing 'data')"
-fi
+# jsonpath returns "" for an unset field; arithmetic on that aborts under 'set -u'.
+num() {
+  local v="${1:-}"
+  if [[ "$v" =~ ^[0-9]+$ ]]; then printf '%s' "$v"; else printf '0'; fi
+}
 
-# 3. An invalid ConfigForge (spec.data longer than maxLength: 40) is REJECTED by the API server
-max_len="$(kubectl get crd "$CRD_NAME" -o jsonpath='{.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.data.maxLength}' 2>/dev/null || true)"
-invalid_rejected=0
-if [[ "$crd_cond" == *"Established=True"* && -n "$max_len" ]]; then
-  if ! kubectl -n "$NS" apply -f - >/dev/null 2>&1 <<'EOF'
-apiVersion: lab.example.com/v1
-kind: ConfigForge
-metadata:
-  name: invalid-probe
-spec:
-  data: "nilai-konfigurasi-ini-sengaja-dibuat-lebih-dari-empat-puluh-karakter-agar-ditolak"
-EOF
-  then
-    invalid_rejected=1
+# BYO declaration: only the load URL depends on it, never an assertion on the image name.
+LOAD_PORT="$DEF_PORT"
+LOAD_PATH="$DEF_PATH"
+DECL_IMAGE=""
+if [[ -f "$DECL" ]]; then
+  while IFS='=' read -r key value || [[ -n "${key:-}" ]]; do
+    key="$(trim "${key:-}")"
+    value="$(trim "${value:-}")"
+    case "$key" in
+      image) [[ -n "$value" ]] && DECL_IMAGE="$value" ;;
+      port)  [[ -n "$value" ]] && LOAD_PORT="$value" ;;
+      path)  [[ -n "$value" ]] && LOAD_PATH="$value" ;;
+      ""|\#*) : ;;
+    esac
+  done < "$DECL"
+fi
+if [[ ! "$LOAD_PORT" =~ ^[0-9]+$ ]] || [[ "$LOAD_PORT" -lt 1 ]] || [[ "$LOAD_PORT" -gt 65535 ]]; then
+  printf 'WARN: port=%s in %s is not a valid port (expected: 1-65535); using %s\n' \
+    "$LOAD_PORT" "$DECL" "$DEF_PORT"
+  LOAD_PORT="$DEF_PORT"
+fi
+[[ "$LOAD_PATH" == /* ]] || LOAD_PATH="/$LOAD_PATH"
+LOAD_URL="http://demo.${NS}.svc.cluster.local:${LOAD_PORT}${LOAD_PATH}"
+printf 'INFO: declaration %s image=%s (INFO only, never asserted), load target %s\n' \
+  "$DECL" "${DECL_IMAGE:-default podinfo:6.7.1}" "$LOAD_URL"
+dep_image="$(kubectl -n "$NS" get deployment demo -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)"
+printf 'INFO: Deployment %s/demo image=%s (INFO only, never asserted)\n' "$NS" "${dep_image:-missing}"
+
+# 1. Metrics API answers — pod metrics for this namespace, node metrics as the fallback.
+top_out=""
+top_source=""
+for attempt in $(seq 1 30); do
+  top_out="$(kubectl -n "$NS" top pods --no-headers 2>/dev/null || true)"
+  top_source="kubectl -n ${NS} top pods"
+  if [[ -z "$top_out" ]]; then
+    top_out="$(kubectl top nodes --no-headers 2>/dev/null || true)"
+    top_source="kubectl top nodes"
   fi
-  kubectl -n "$NS" delete configforge invalid-probe --ignore-not-found >/dev/null 2>&1 || true
-fi
-if [[ "$invalid_rejected" -eq 1 ]]; then
-  pass "Invalid ConfigForge (spec.data > maxLength=${max_len}) was rejected by the API server (expected: rejected by OpenAPI schema validation)"
-else
-  fail "Invalid ConfigForge was not rejected by OpenAPI validation (maxLength='${max_len:-missing}') (expected: rejected by OpenAPI schema validation)"
-fi
-
-# 4. Participant's valid ConfigForge exists in cka-lab16 and is readable
-cf_name="$(kubectl -n "$NS" get configforge app-cfg -o jsonpath='{.metadata.name}' 2>/dev/null || true)"
-cf_data="$(kubectl -n "$NS" get configforge app-cfg -o jsonpath='{.spec.data}' 2>/dev/null || true)"
-if [[ -z "$cf_name" ]]; then
-  cf_name="$(kubectl -n "$NS" get configforge -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
-  cf_data="$(kubectl -n "$NS" get configforge -o jsonpath='{.items[0].spec.data}' 2>/dev/null || true)"
-fi
-if [[ -n "$cf_name" && -n "$cf_data" && "${#cf_data}" -le 40 ]]; then
-  pass "Valid ConfigForge '${NS}/${cf_name}' is accepted and readable with spec.data='${cf_data}' (expected: valid ConfigForge present in ${NS})"
-else
-  fail "No valid ConfigForge found in '${NS}' (name='${cf_name:-missing}', spec.data='${cf_data:-missing}') (expected: valid ConfigForge present in ${NS})"
-fi
-
-# 5. CRD 'ingressroutes.traefik.io' exists (Established=True) and Traefik deployment is Available
-ir_crd_cond=""
-tr_avail=""
-for _ in $(seq 1 "$(ptries get crd "$TRAEFIK_CRD")"); do
-  ir_crd_cond="$(kubectl get crd "$TRAEFIK_CRD" -o jsonpath='{range .status.conditions[*]}{.type}={.status} {end}' 2>/dev/null || true)"
-  tr_avail="$(kubectl -n "$TRAEFIK_NS" get deployment traefik -o jsonpath='{range .status.conditions[*]}{.type}={.status} {end}' 2>/dev/null || true)"
-  [[ "$ir_crd_cond" == *"Established=True"* && "$tr_avail" == *"Available=True"* ]] && break
-  sleep 2
-done
-if [[ "$ir_crd_cond" == *"Established=True"* && "$tr_avail" == *"Available=True"* ]]; then
-  pass "CRD '${TRAEFIK_CRD}' has Established=True and Deployment '${TRAEFIK_NS}/traefik' has Available=True (expected: Established=True and Available=True)"
-else
-  fail "CRD '${TRAEFIK_CRD}' conditions='${ir_crd_cond:-missing}', Deployment '${TRAEFIK_NS}/traefik' conditions='${tr_avail:-missing}' (expected: Established=True and Available=True)"
-fi
-
-# 6. Participant's IngressRoute exists in cka-lab16 with host 'app.lab16.local' and service 'web' (port 80)
-ir_name=""
-ir_match=""
-ir_svc=""
-ir_port=""
-for _ in $(seq 1 "$(ptries -n "$NS" get ingressroute app-route)"); do
-  if kubectl -n "$NS" get ingressroute app-route >/dev/null 2>&1; then
-    ir_name="app-route"
-  else
-    ir_name="$(kubectl -n "$NS" get ingressroutes.traefik.io -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
-  fi
-  if [[ -n "$ir_name" ]]; then
-    ir_match="$(kubectl -n "$NS" get ingressroutes.traefik.io "$ir_name" -o jsonpath='{.spec.routes[*].match}' 2>/dev/null || true)"
-    ir_svc="$(kubectl -n "$NS" get ingressroutes.traefik.io "$ir_name" -o jsonpath='{.spec.routes[*].services[*].name}' 2>/dev/null || true)"
-    ir_port="$(kubectl -n "$NS" get ingressroutes.traefik.io "$ir_name" -o jsonpath='{.spec.routes[*].services[*].port}' 2>/dev/null || true)"
+  if [[ -n "$top_out" ]]; then
     break
   fi
+  printf 'INFO: metrics API pending (%d/30)\n' "$attempt"
   sleep 2
 done
-if [[ -z "$ir_name" ]]; then
-  ir_name="$(kubectl -n "$NS" get ingressroutes.traefik.io -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
-  if [[ -n "$ir_name" ]]; then
-    ir_match="$(kubectl -n "$NS" get ingressroutes.traefik.io "$ir_name" -o jsonpath='{.spec.routes[*].match}' 2>/dev/null || true)"
-    ir_svc="$(kubectl -n "$NS" get ingressroutes.traefik.io "$ir_name" -o jsonpath='{.spec.routes[*].services[*].name}' 2>/dev/null || true)"
-    ir_port="$(kubectl -n "$NS" get ingressroutes.traefik.io "$ir_name" -o jsonpath='{.spec.routes[*].services[*].port}' 2>/dev/null || true)"
-  fi
-fi
-if [[ -n "$ir_name" && "$ir_match" == *"app.lab16.local"* && "$ir_svc" == *"web"* && ( "$ir_port" == *"80"* || "$ir_port" == *"http"* ) ]]; then
-  pass "IngressRoute '${NS}/${ir_name}' routes match='${ir_match}' to service='${ir_svc}' port='${ir_port}' (expected: Host app.lab16.local -> service web:80)"
+if [[ -n "$top_out" ]]; then
+  pass "Metrics API responds: '${top_source}' returned $(printf '%s\n' "$top_out" | wc -l | tr -d ' ') row(s) (expected: metrics available)"
 else
-  fail "IngressRoute in '${NS}' (name='${ir_name:-missing}', match='${ir_match:-missing}', service='${ir_svc:-missing}:${ir_port:-missing}') invalid (expected: Host app.lab16.local -> service web:80)"
+  fail "Metrics API did not answer 'kubectl top nodes' or 'kubectl -n ${NS} top pods' within 60s (expected: metrics available)"
 fi
 
-# Discover Traefik HTTP NodePort (defaults to 30082 from setup.sh)
-np="$(kubectl -n "$TRAEFIK_NS" get svc traefik -o jsonpath='{.spec.ports[?(@.name=="web")].nodePort}' 2>/dev/null || true)"
-[[ -z "$np" ]] && np="$(kubectl -n "$TRAEFIK_NS" get svc traefik -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || true)"
-np="${np:-30082}"
-
-# 7. HTTP through Traefik NodePort with Host: app.lab16.local returns nginx welcome page (bounded poll)
-web_body=""
-for _ in $(seq 1 "$(ptries -n "$NS" get ingressroutes.traefik.io "${ir_name:-app-route}")"); do
-  web_body="$(curl -s --max-time 3 -H 'Host: app.lab16.local' "http://localhost:${np}/" 2>/dev/null || true)"
-  if printf '%s\n' "$web_body" | grep -qi "Welcome to nginx"; then
-    break
-  fi
-  sleep 2
-done
-if printf '%s\n' "$web_body" | grep -qi "Welcome to nginx"; then
-  pass "HTTP probe 'curl -H \"Host: app.lab16.local\" http://localhost:${np}/' returned nginx welcome page (expected: 'Welcome to nginx')"
-else
-  fail "HTTP probe 'curl -H \"Host: app.lab16.local\" http://localhost:${np}/' did not return nginx welcome page (expected: 'Welcome to nginx')"
-fi
-
-# 8. After deleting the IngressRoute, the same request no longer returns nginx (404) (bounded poll), then restore
-route_gone_status=""
-route_gone_body=""
-if [[ -n "$ir_name" ]] && printf '%s\n' "$web_body" | grep -qi "Welcome to nginx"; then
-  kubectl -n "$NS" get ingressroutes.traefik.io "$ir_name" -o json 2>/dev/null \
-    | jq 'del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.generation, .metadata.managedFields, .status)' \
-    > "$IR_BACKUP" 2>/dev/null || true
-  kubectl -n "$NS" delete ingressroutes.traefik.io "$ir_name" --ignore-not-found >/dev/null 2>&1 || true
-
-  for _ in $(seq 1 15); do
-    route_gone_status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 -H 'Host: app.lab16.local' "http://localhost:${np}/" 2>/dev/null || true)"
-    route_gone_body="$(curl -s --max-time 3 -H 'Host: app.lab16.local' "http://localhost:${np}/" 2>/dev/null || true)"
-    if [[ "$route_gone_status" == "404" ]] && ! printf '%s\n' "$route_gone_body" | grep -qi "Welcome to nginx"; then
+# 2. Deployment 'demo' is Ready and carries resources.requests.cpu
+#    HPA cannot compute a percentage without the request; the value itself is not locked.
+dep_uid="$(kubectl -n "$NS" get deployment demo -o jsonpath='{.metadata.uid}' 2>/dev/null || true)"
+req_cpu="$(kubectl -n "$NS" get deployment demo -o jsonpath='{.spec.template.spec.containers[0].resources.requests.cpu}' 2>/dev/null || true)"
+dep_ready=0
+dep_ready_note=""
+if [[ -n "$dep_uid" ]]; then
+  for attempt in $(seq 1 20); do
+    spec_r="$(num "$(kubectl -n "$NS" get deployment demo -o jsonpath='{.spec.replicas}' 2>/dev/null || true)")"
+    ready_r="$(num "$(kubectl -n "$NS" get deployment demo -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)")"
+    [[ "$spec_r" -lt 1 ]] && spec_r=1
+    if [[ "$ready_r" -ge 1 && "$ready_r" -eq "$spec_r" ]]; then
+      dep_ready=1
+      dep_ready_note="readyReplicas=${ready_r}/${spec_r}"
       break
     fi
+    dep_ready_note="readyReplicas=${ready_r}/${spec_r}"
+    printf 'INFO: Deployment readiness poll %d/20: %s\n' "$attempt" "$dep_ready_note"
+    sleep 3
+  done
+else
+  dep_ready_note="Deployment missing"
+fi
+if [[ "$dep_ready" -eq 1 && -n "$req_cpu" ]]; then
+  pass "Deployment '${NS}/demo' is Ready (${dep_ready_note}) with resources.requests.cpu='${req_cpu}' (expected: Ready with requests.cpu set)"
+else
+  fail "Deployment '${NS}/demo' is Ready=${dep_ready} (${dep_ready_note:-no observation}) requests.cpu='${req_cpu:-missing}' (expected: Ready with requests.cpu set)"
+fi
+
+# 3. HPA 'demo' targets Deployment/demo with min=1, max=4, CPU target 50%
+hpa_uid="$(kubectl -n "$NS" get hpa demo -o jsonpath='{.metadata.uid}' 2>/dev/null || true)"
+hpa_ref="$(kubectl -n "$NS" get hpa demo -o jsonpath='{.spec.scaleTargetRef.kind}/{.spec.scaleTargetRef.name}' 2>/dev/null || true)"
+hpa_min="$(kubectl -n "$NS" get hpa demo -o jsonpath='{.spec.minReplicas}' 2>/dev/null || true)"
+hpa_max="$(kubectl -n "$NS" get hpa demo -o jsonpath='{.spec.maxReplicas}' 2>/dev/null || true)"
+hpa_cpu_v2="$(kubectl -n "$NS" get hpa demo -o jsonpath='{.spec.metrics[0].resource.target.averageUtilization}' 2>/dev/null || true)"
+hpa_cpu_v1="$(kubectl -n "$NS" get hpa demo -o jsonpath='{.spec.targetCPUUtilizationPercentage}' 2>/dev/null || true)"
+hpa_cpu="${hpa_cpu_v2:-$hpa_cpu_v1}"
+if [[ -n "$hpa_uid" && "$hpa_ref" == "Deployment/demo" && "${hpa_min:-1}" == "1" && "$hpa_max" == "4" && "$hpa_cpu" == "50" ]]; then
+  pass "HorizontalPodAutoscaler '${NS}/demo' targets ${hpa_ref} min=${hpa_min:-1} max=${hpa_max} cpu=${hpa_cpu}% (expected: Deployment/demo, min=1, max=4, cpu=50%)"
+else
+  fail "HorizontalPodAutoscaler '${NS}/demo' target='${hpa_ref:-missing}' min=${hpa_min:-missing} max=${hpa_max:-missing} cpu=${hpa_cpu:-missing}% (expected: Deployment/demo, min=1, max=4, cpu=50%)"
+fi
+
+# 4. Under load, Deployment 'demo' holds more than one ready replica.
+# Gate the wait on the objects existing: three minutes of silence on a missing HPA reads as a
+# hung verifier to the trainer, which is worse than an immediate, clear FAIL.
+max_ready="$(num "$(kubectl -n "$NS" get deployment demo -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)")"
+max_hpa_cur=0
+scaled_up=0
+scale_note=""
+
+if [[ -z "$hpa_uid" || -z "$dep_uid" ]]; then
+  scale_note="not attempted: HPA or Deployment missing"
+else
+  cleanup
+  load_pod_gone=0
+  for attempt in $(seq 1 15); do
+    if ! kubectl -n "$NS" get pod "$VERIFY_LOAD_POD" >/dev/null 2>&1; then
+      load_pod_gone=1
+      break
+    fi
+    printf 'INFO: previous verifier load Pod deletion pending (%d/15)\n' "$attempt"
     sleep 2
   done
 
-  # Restore participant's IngressRoute so the cluster remains in solved state after verify.sh finishes
-  if [[ -s "$IR_BACKUP" ]]; then
-    kubectl apply -f "$IR_BACKUP" >/dev/null 2>&1 || true
-    for _ in $(seq 1 15); do
-      restored_body="$(curl -s --max-time 3 -H 'Host: app.lab16.local' "http://localhost:${np}/" 2>/dev/null || true)"
-      if printf '%s\n' "$restored_body" | grep -qi "Welcome to nginx"; then
+  # 4 parallel wget loops against the Service: one sequential loop burns ~68m of a 100m
+  # request, too close to the 50% target, and the HPA then flaps 1<->2 instead of holding.
+  load_cmd="for i in 1 2 3 4; do (while true; do wget -q -O- ${LOAD_URL} >/dev/null 2>&1; done) & done; wait"
+  if [[ "$load_pod_gone" -ne 1 ]]; then
+    scale_note="not attempted: previous verifier load Pod still terminating after 30s"
+  elif ! kubectl -n "$NS" run "$VERIFY_LOAD_POD" --image=busybox:1.37 --image-pull-policy=IfNotPresent \
+    --restart=Never --command -- sh -c "$load_cmd" >/dev/null; then
+    scale_note="not attempted: could not create verifier load Pod"
+  else
+    load_running=0
+    for attempt in $(seq 1 15); do
+      load_phase="$(kubectl -n "$NS" get pod "$VERIFY_LOAD_POD" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+      if [[ "$load_phase" == "Running" ]]; then
+        load_running=1
         break
       fi
+      [[ "$load_phase" == "Failed" || "$load_phase" == "Succeeded" ]] && break
+      printf 'INFO: verifier load Pod poll %d/15: phase=%s\n' "$attempt" "${load_phase:-unknown}"
       sleep 2
     done
-    rm -f "$IR_BACKUP" >/dev/null 2>&1 || true
+
+    if [[ "$load_running" -ne 1 ]]; then
+      scale_note="not attempted: verifier load Pod never reached Running"
+    else
+      poll_max=$((SCALE_WINDOW_SECONDS / SCALE_POLL_INTERVAL))
+      printf 'INFO: load running; polling up to %ds for readyReplicas>1...\n' "$SCALE_WINDOW_SECONDS"
+      for attempt in $(seq 1 "$poll_max"); do
+        ready_r="$(num "$(kubectl -n "$NS" get deployment demo -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)")"
+        des_r="$(num "$(kubectl -n "$NS" get deployment demo -o jsonpath='{.status.replicas}' 2>/dev/null || true)")"
+        cur_r="$(num "$(kubectl -n "$NS" get hpa demo -o jsonpath='{.status.currentReplicas}' 2>/dev/null || true)")"
+        cpu_r="$(kubectl -n "$NS" get hpa demo -o jsonpath='{.status.currentMetrics[0].resource.current.averageUtilization}' 2>/dev/null || true)"
+        [[ "$ready_r" -gt "$max_ready" ]] && max_ready="$ready_r"
+        [[ "$cur_r" -gt "$max_hpa_cur" ]] && max_hpa_cur="$cur_r"
+        if [[ $((attempt % 5)) -eq 1 ]]; then
+          printf 'INFO: scale-out poll %d/%d: ready=%s replicas=%s hpaCurrent=%s cpu=%s%%\n' \
+            "$attempt" "$poll_max" "$ready_r" "$des_r" "${cur_r:-0}" "${cpu_r:-unknown}"
+        fi
+        if [[ "$ready_r" -gt 1 ]]; then
+          scaled_up=1
+          scale_note="ready=${ready_r} after ~$((attempt * SCALE_POLL_INTERVAL))s of load (hpaCurrent=${cur_r:-0}, cpu=${cpu_r:-unknown}%)"
+          break
+        fi
+        sleep "$SCALE_POLL_INTERVAL"
+      done
+      [[ "$scaled_up" -eq 1 ]] || scale_note="peak readyReplicas=${max_ready} after ${SCALE_WINDOW_SECONDS}s of load"
+    fi
   fi
-fi
-if [[ "$route_gone_status" == "404" ]] && ! printf '%s\n' "$route_gone_body" | grep -qi "Welcome to nginx"; then
-  pass "Deleting IngressRoute '${NS}/${ir_name}' caused Traefik to remove the route and return HTTP ${route_gone_status} (expected: HTTP 404 without nginx page)"
-else
-  fail "After deleting IngressRoute '${NS}/${ir_name:-missing}', probe returned HTTP '${route_gone_status:-none}' (expected: HTTP 404 after active IngressRoute reconciled and deleted)"
 fi
 
-# 9. reset.sh exists, is valid bash, deletes namespace cka-lab16 and CRD configforges.lab.example.com, and leaves Traefik installed
-reset_ok=0
-if [[ -f "$RESET_SCRIPT" ]] && bash -n "$RESET_SCRIPT" >/dev/null 2>&1; then
-  if grep -q 'delete namespace' "$RESET_SCRIPT" \
-    && grep -q 'configforges.lab.example.com' "$RESET_SCRIPT" \
-    && ! grep -Eq 'helm uninstall|delete namespace.*traefik' "$RESET_SCRIPT"; then
-    reset_ok=1
-  fi
-fi
-if [[ "$reset_ok" -eq 1 ]]; then
-  pass "reset/reset.sh is valid and deletes namespace '${NS}' + CRD '${CRD_NAME}' while keeping Traefik installed (expected: deletes ${NS} and ${CRD_NAME}, keeps Traefik)"
+if [[ "$scaled_up" -eq 1 ]]; then
+  pass "Deployment '${NS}/demo' scaled out under load: ${scale_note} (expected: readyReplicas>1 within ${SCALE_WINDOW_SECONDS}s of load start)"
 else
-  fail "reset/reset.sh missing or does not match documented reset behavior (expected: deletes ${NS} and ${CRD_NAME}, keeps Traefik)"
+  fail "Deployment '${NS}/demo' never reached readyReplicas>1 within ${SCALE_WINDOW_SECONDS}s of load start (peak ready=${max_ready}, peak hpaCurrent=${max_hpa_cur}, ${scale_note:-no observation}) (expected: readyReplicas>1 within ${SCALE_WINDOW_SECONDS}s of load start)"
+fi
+
+# 5. Scale-in: load removed, Deployment back to a single ready replica.
+# Both load pods go: the verifier's own and the participant's load-generator, because a leftover
+# generator keeps the CPU above target and would turn a correct answer into a FAIL.
+if [[ "$scaled_up" -ne 1 ]]; then
+  fail "Scale-in not observed: scale-out never happened, so there is nothing to scale back from (${scale_note:-no observation}) (expected: readyReplicas back to 1 within ${SCALE_IN_WINDOW_SECONDS}s after the load stops)"
+else
+  cleanup
+  kubectl -n "$NS" delete pod "$PARTICIPANT_LOAD_POD" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+  for attempt in $(seq 1 15); do
+    if ! kubectl -n "$NS" get pod "$VERIFY_LOAD_POD" >/dev/null 2>&1 \
+      && ! kubectl -n "$NS" get pod "$PARTICIPANT_LOAD_POD" >/dev/null 2>&1; then
+      break
+    fi
+    printf 'INFO: load Pod termination pending (%d/15)\n' "$attempt"
+    sleep 2
+  done
+
+  poll_max=$((SCALE_IN_WINDOW_SECONDS / SCALE_POLL_INTERVAL))
+  printf 'INFO: load removed; polling up to %ds for readyReplicas back to 1...\n' "$SCALE_IN_WINDOW_SECONDS"
+  scaled_in=0
+  scale_in_note=""
+  for attempt in $(seq 1 "$poll_max"); do
+    ready_r="$(num "$(kubectl -n "$NS" get deployment demo -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)")"
+    spec_r="$(num "$(kubectl -n "$NS" get deployment demo -o jsonpath='{.spec.replicas}' 2>/dev/null || true)")"
+    cur_r="$(num "$(kubectl -n "$NS" get hpa demo -o jsonpath='{.status.currentReplicas}' 2>/dev/null || true)")"
+    cpu_r="$(kubectl -n "$NS" get hpa demo -o jsonpath='{.status.currentMetrics[0].resource.current.averageUtilization}' 2>/dev/null || true)"
+    scale_in_note="ready=${ready_r} spec=${spec_r} hpaCurrent=${cur_r} cpu=${cpu_r:-unknown}%"
+    if [[ $((attempt % 5)) -eq 1 ]]; then
+      printf 'INFO: scale-in poll %d/%d: %s\n' "$attempt" "$poll_max" "$scale_in_note"
+    fi
+    if [[ "$ready_r" -le 1 && "$spec_r" -le 1 ]]; then
+      scaled_in=1
+      scale_in_note="${scale_in_note} after ~$((attempt * SCALE_POLL_INTERVAL))s without load"
+      break
+    fi
+    sleep "$SCALE_POLL_INTERVAL"
+  done
+
+  if [[ "$scaled_in" -eq 1 ]]; then
+    pass "Deployment '${NS}/demo' scaled back in: ${scale_in_note} (expected: readyReplicas back to 1 within ${SCALE_IN_WINDOW_SECONDS}s after the load stops)"
+  else
+    fail "Deployment '${NS}/demo' did not return to 1 ready replica within ${SCALE_IN_WINDOW_SECONDS}s after the load stopped (${scale_in_note:-no observation}) (expected: readyReplicas back to 1 within ${SCALE_IN_WINDOW_SECONDS}s after the load stops)"
+  fi
 fi
 
 if [[ "$passed" -eq "$total" ]]; then

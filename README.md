@@ -70,6 +70,19 @@ Dua pengecualian:
 - Cluster rusak dan tidak bisa dipulihkan: hubungi trainer. Trainer yang membangun ulang,
   bukan peserta.
 
+## Workbook dan lembar koreksi
+
+Berkas cetak ada di `docs/workbook/`:
+
+| Berkas | Isi |
+|---|---|
+| `workbook-cka-lkpp-fillable.pdf` | Workbook peserta (Dokumen 10) — isi latihan per sesi |
+| `erratum-day1.pdf` | Lembar koreksi hari 1 (1 hlm) |
+| `erratum-day2-4.pdf` | Lembar koreksi hari 2–4 (3 hlm) |
+
+Bagian lab yang berbeda dari workbook ada di lembar erratum, bukan di workbook. Baca erratum
+sesuai hari sebelum mengerjakan lab.
+
 ## Peta sesi
 
 `docs/session-lab-map.md` memetakan 16 sesi deck ke 18 lab; nomor lab sekarang sama dengan nomor

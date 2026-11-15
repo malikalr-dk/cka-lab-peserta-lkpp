@@ -41,7 +41,7 @@ Cakupan domain CKA: Troubleshooting (30%), yaitu troubleshoot clusters/nodes (Fa
    - Periksa konfigurasi `/var/lib/kubelet/config.yaml` dan temukan ketidaksesuaian yang bikin `kubelet` gagal atau berhenti.
 
 3. **Perbaiki dan pastikan persisten:**
-   - Kembalikan konfigurasi `cgroupDriver` pada `/var/lib/kubelet/config.yaml` agar sesuai dengan runtime `containerd` (`systemd`).
+   - Samakan nilai di `/var/lib/kubelet/config.yaml` dengan driver yang benar-benar dipakai runtime di node itu, lalu simpan.
    - Muat ulang dan jalankan kembali service `kubelet` (`systemctl daemon-reload && systemctl enable --now kubelet` / `systemctl restart kubelet`).
    - Pastikan seluruh node kembali berstatus `Ready` dari node *control plane*.
 
@@ -49,7 +49,7 @@ Cakupan domain CKA: Troubleshooting (30%), yaitu troubleshoot clusters/nodes (Fa
 
 ### Bagian 2 — Insiden 2 (Fault B): `kube-apiserver` Tidak Merespons
 
-> Minta trainer menyuntikkan **Fault B** (`bash labs/LAB-13/fault/fault.sh b`) sebelum memulai bagian ini.
+> Minta trainer menyuntikkan **Fault B** sebelum memulai bagian ini.
 
 1. **Kenali kegagalan komponen control plane:**
    - Amati bahwa perintah `kubectl` gagal menghubungi API server (`The connection to the server ... was refused`).

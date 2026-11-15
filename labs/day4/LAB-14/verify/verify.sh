@@ -30,12 +30,16 @@ else
 fi
 
 # 2. Deployment hasil Helm: 2 replika Ready
+#    Retry hanya berguna kalau objeknya ada; Deployment yang belum dibuat tidak akan muncul
+#    dalam 30 detik, jadi jangan bakar kuota retry (state awal lab memang belum punya rilis).
 helm_dep_ready=""
-for _ in $(seq 1 15); do
-  helm_dep_ready="$(kubectl -n "$NS_HELM" get deployment "$RELEASE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
-  [[ "${helm_dep_ready:-0}" -eq 2 ]] && break
-  sleep 2
-done
+if kubectl -n "$NS_HELM" get deployment "$RELEASE" >/dev/null 2>&1; then
+  for _ in $(seq 1 15); do
+    helm_dep_ready="$(kubectl -n "$NS_HELM" get deployment "$RELEASE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+    [[ "${helm_dep_ready:-0}" -eq 2 ]] && break
+    sleep 2
+  done
+fi
 helm_dep_rep="$(kubectl -n "$NS_HELM" get deployment "$RELEASE" -o jsonpath='{.spec.replicas}' 2>/dev/null || true)"
 if [[ "${helm_dep_rep:-0}" == "2" && "${helm_dep_ready:-0}" -eq 2 ]]; then
   pass "Helm-managed Deployment '${NS_HELM}/${RELEASE}' has replicas=${helm_dep_ready}/${helm_dep_rep} (expected: 2/2 Ready)"
@@ -52,25 +56,33 @@ else
 fi
 
 # 4. Prometheus siap
+#    Nama StatefulSet dicari lewat label: chart memotong nama default menjadi
+#    `prometheus-kube-prometheus-kube-prome-prometheus`, jadi nama hardcode tidak pernah cocok.
+prom_sts="$(kubectl -n "$NS_MON" get statefulset -l app.kubernetes.io/name=prometheus -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+[[ -n "$prom_sts" ]] || prom_sts="prometheus-${MON_RELEASE}-prometheus"
 prom_ready=""
-for _ in $(seq 1 20); do
-  prom_ready="$(kubectl -n "$NS_MON" get statefulset prometheus-${MON_RELEASE}-prometheus -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
-  [[ "${prom_ready:-0}" -ge 1 ]] && break
-  sleep 6
-done
+if kubectl -n "$NS_MON" get statefulset "$prom_sts" >/dev/null 2>&1; then
+  for _ in $(seq 1 20); do
+    prom_ready="$(kubectl -n "$NS_MON" get statefulset "$prom_sts" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+    [[ "${prom_ready:-0}" -ge 1 ]] && break
+    sleep 6
+  done
+fi
 if [[ "${prom_ready:-0}" -ge 1 ]]; then
-  pass "Prometheus '${NS_MON}/prometheus-${MON_RELEASE}-prometheus' has ${prom_ready} ready replica (expected: >= 1)"
+  pass "Prometheus '${NS_MON}/${prom_sts}' has ${prom_ready} ready replica (expected: >= 1)"
 else
-  fail "Prometheus '${NS_MON}/prometheus-${MON_RELEASE}-prometheus' has ${prom_ready:-0} ready replicas (expected: >= 1)"
+  fail "Prometheus '${NS_MON}/${prom_sts}' has ${prom_ready:-0} ready replicas (expected: >= 1)"
 fi
 
 # 5. Grafana siap
 graf_ready=""
-for _ in $(seq 1 20); do
-  graf_ready="$(kubectl -n "$NS_MON" get deployment "${MON_RELEASE}-grafana" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
-  [[ "${graf_ready:-0}" -ge 1 ]] && break
-  sleep 6
-done
+if kubectl -n "$NS_MON" get deployment "${MON_RELEASE}-grafana" >/dev/null 2>&1; then
+  for _ in $(seq 1 20); do
+    graf_ready="$(kubectl -n "$NS_MON" get deployment "${MON_RELEASE}-grafana" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+    [[ "${graf_ready:-0}" -ge 1 ]] && break
+    sleep 6
+  done
+fi
 if [[ "${graf_ready:-0}" -ge 1 ]]; then
   pass "Grafana '${NS_MON}/${MON_RELEASE}-grafana' has ${graf_ready} ready replica (expected: >= 1)"
 else

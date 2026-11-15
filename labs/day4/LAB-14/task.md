@@ -29,7 +29,7 @@ Cakupan domain CKA: Cluster Architecture, Installation & Configuration (25%), bu
 
 4. **Baca monitoring:**
    - `kubectl -n lab-monitoring get pods` → Prometheus dan Grafana `Running`
-   - `kubectl top nodes` dan `kubectl -n gisp-app top pods` → angka keluar (metrics-server ikut melayani)
+   - `kubectl top nodes` dan `kubectl -n gisp-app top pods` → tabel CPU/memory keluar. Angka ini datang dari **metrics-server** di `kube-system`, bukan dari Prometheus. Kalau muncul `error: Metrics API not available`, pakai bagian "Kalau `kubectl top` belum keluar angka" di bawah.
    - Buka Grafana hanya kalau trainer menunjukkan caranya; yang dinilai adalah Prometheus/Grafana hidup, bukan dashboard yang kamu buat.
 
 5. **Tulis laporan** di `/root/lab17/report.txt`, tepat dua baris:
@@ -40,6 +40,23 @@ Cakupan domain CKA: Cluster Architecture, Installation & Configuration (25%), bu
    ```
 
 6. **Jalankan verifier:** `bash verify/verify.sh` → `RESULT: PASS (6/6)`.
+
+## Kalau `kubectl top` belum keluar angka
+
+`metrics-server` sudah dipasang trainer di namespace `kube-system` dari manifest lokal `/opt/lab/manifests/metrics-server.yaml`. Image-nya sudah ada di cache containerd setiap node, jadi tidak ada unduhan internet. Kalau `kubectl top nodes` mengeluarkan `error: Metrics API not available`, cek berurutan:
+
+```bash
+kubectl -n kube-system get pods -l k8s-app=metrics-server          # STATUS harus Running
+kubectl get apiservice v1beta1.metrics.k8s.io -o wide              # AVAILABLE harus True
+kubectl -n kube-system logs deploy/metrics-server --tail=20        # cari baris error TLS/x509
+kubectl top nodes                                                  # ulangi setelah ±30 detik
+```
+
+- Pod `metrics-server` belum `Running`: `kubectl -n kube-system rollout status deploy/metrics-server --timeout=60s`, lalu ulangi `kubectl top nodes`.
+- `apiservice` AVAILABLE `False` dengan pesan `x509`/`certificate`: flag `--kubelet-insecure-tls` hilang dari Deployment. Jangan bongkar sendiri — lapor trainer.
+- Baru pertama kali membaca: metrics API butuh satu siklus scrape (±15–30 detik) sebelum angkanya keluar.
+
+Jangan menghapus atau mengubah `metrics-server` di `kube-system`; itu prasyarat lab, bukan bagian tugas.
 
 ## Batasan
 

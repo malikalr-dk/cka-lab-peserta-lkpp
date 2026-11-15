@@ -120,9 +120,14 @@ if ! helm upgrade --install "$MON_RELEASE" "$MON_CHART" -n "$NS_MON" --create-na
 fi
 
 printf 'INFO: menunggu Prometheus dan Grafana siap...\n'
+# Nama StatefulSet dicari lewat label: chart memotong nama default menjadi
+# `prometheus-kube-prometheus-kube-prome-prometheus`, jadi nama hardcode tidak pernah cocok dan
+# loop ini akan selalu menunggu penuh 8 menit lalu gagal walau monitoring sudah siap.
+prom_sts="$(kubectl -n "$NS_MON" get statefulset -l app.kubernetes.io/name=prometheus -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+[[ -n "$prom_sts" ]] || prom_sts="prometheus-${MON_RELEASE}-prometheus"
 mon_ok=0
 for _ in $(seq 1 80); do
-  prom="$(kubectl -n "$NS_MON" get statefulset prometheus-kube-prometheus-prometheus -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+  prom="$(kubectl -n "$NS_MON" get statefulset "$prom_sts" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
   graf="$(kubectl -n "$NS_MON" get deployment "$MON_RELEASE-grafana" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
   if [[ "${prom:-0}" -ge 1 && "${graf:-0}" -ge 1 ]]; then
     mon_ok=1
@@ -134,6 +139,38 @@ if [[ "$mon_ok" -ne 1 ]]; then
   printf 'FAIL: monitoring belum siap (prometheus=%s grafana=%s). Cek: kubectl -n %s get pods\n' \
     "${prom:-0}" "${graf:-0}" "$NS_MON" >&2
   exit 1
+fi
+
+# --- metrics-server: prasyarat langkah `kubectl top` di task.md ------------------------------
+# Image sudah ada di cache containerd setiap node; kalau metrics API sudah menjawab, jangan
+# disentuh supaya starter tetap cepat saat dijalankan berulang.
+METRICS_MANIFEST="/opt/lab/manifests/metrics-server.yaml"
+if kubectl top nodes >/dev/null 2>&1; then
+  printf 'INFO: metrics API sudah menjawab; metrics-server tidak disentuh\n'
+elif [[ -f "$METRICS_MANIFEST" ]]; then
+  printf 'INFO: memasang metrics-server dari %s\n' "$METRICS_MANIFEST"
+  if ! kubectl apply -f "$METRICS_MANIFEST" >/dev/null; then
+    printf 'WARN: kubectl apply %s gagal; metrics API bisa tetap tidak tersedia\n' "$METRICS_MANIFEST" >&2
+  fi
+  existing_args="$(kubectl -n kube-system get deployment metrics-server -o jsonpath='{.spec.template.spec.containers[0].args[*]}' 2>/dev/null || true)"
+  if ! printf '%s\n' "$existing_args" | grep -q -- '--kubelet-insecure-tls'; then
+    kubectl -n kube-system patch deployment metrics-server --type='json' \
+      -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]' >/dev/null 2>&1 || true
+  fi
+  kubectl -n kube-system patch deployment metrics-server --type='json' \
+    -p='[{"op":"replace","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"IfNotPresent"}]' >/dev/null 2>&1 || true
+  kubectl -n kube-system rollout status deployment/metrics-server --timeout=60s >/dev/null 2>&1 || true
+  for _ in $(seq 1 30); do
+    kubectl top nodes >/dev/null 2>&1 && break
+    sleep 2
+  done
+  if kubectl top nodes >/dev/null 2>&1; then
+    printf 'INFO: metrics API menjawab (kubectl top nodes OK)\n'
+  else
+    printf 'WARN: metrics API belum menjawab; langkah `kubectl top` bisa gagal. Cek: kubectl -n kube-system get pods -l k8s-app=metrics-server\n' >&2
+  fi
+else
+  printf 'WARN: %s tidak ada dan metrics API belum menjawab; langkah `kubectl top` dilewati\n' "$METRICS_MANIFEST" >&2
 fi
 
 printf 'READY: chart lab17-web ada di %s/chart/lab17-web\n' "$LAB_DIR"

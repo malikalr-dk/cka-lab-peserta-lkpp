@@ -9,7 +9,8 @@ cluster masing-masing peserta**, bukan di laptop — cluster sudah disiapkan tra
 Setiap peserta memegang satu cluster 3 node dan satu berkas `lab-hosts.sh` dari trainer.
 
 ```bash
-bash lab-hosts.sh     # sekali saja, butuh sudo: menambah "<ip> lab0N" ke /etc/hosts
+bash lab-hosts.sh     # Linux/macOS, sekali, butuh sudo: menambah "<ip> lab0N" ke /etc/hosts
+powershell -ExecutionPolicy Bypass -File .\lab-hosts.ps1   # Windows, PowerShell as Admin
 ssh lab01             # p1 -> lab01, p2 -> lab02, p3 -> lab03, p4 -> lab04
 ```
 
@@ -24,7 +25,18 @@ cd /opt/lab/labs/LAB-02
 cat task.md                      # tugas yang dikerjakan
 ```
 
-Isi tiap folder lab di repo ini sama dengan yang ada di node:
+Folder lab di repo ini dibagi per hari, mengikuti urutan sesi:
+
+| Hari | Folder | Lab |
+|---|---|---|
+| Day 1 | `labs/day1` | LAB-01..04 |
+| Day 2 | `labs/day2` | LAB-05..08 |
+| Day 3 | `labs/day3` | LAB-09..12 |
+| Day 4 | `labs/day4` | LAB-13, LAB-14 (+ symlink LAB-10 dan LAB-12) |
+| Take-home | `labs/takehome` | LAB-15..18 |
+
+Di node semua lab tetap di `/opt/lab/labs/LAB-NN` (tanpa folder hari). Isi tiap folder lab sama
+dengan yang ada di node:
 
 | Folder | Isi |
 |---|---|
@@ -45,8 +57,8 @@ Jalankan `verify.sh` dari node, bukan dari laptop. Skrip ini membaca cluster lew
 
 Dua pengecualian:
 
-- **LAB-18** (troubleshooting) tidak punya `starter/` maupun `reset/`: dua insidennya disuntikkan
-  trainer, dan skrip penyuntiknya sengaja tidak dibagikan supaya tidak membocorkan akar masalah.
+- **LAB-13** (troubleshooting) tidak membawa `fault/`: dua insidennya disuntikkan trainer, dan skrip
+  penyuntiknya sengaja tidak dibagikan supaya tidak membocorkan akar masalah.
 - **LAB-03** destruktif: `kubeadm reset -f` adalah bagian tugasnya. Kalau cluster tidak bisa
   dipulihkan sendiri, minta trainer membangun ulang.
 
@@ -60,9 +72,9 @@ Dua pengecualian:
 
 ## Peta sesi
 
-`docs/session-lab-map.md` memetakan 16 sesi deck ke 18 lab, termasuk empat lab tambahan
-(LAB-13..LAB-16) yang dikerjakan di luar jam kelas. `docs/cka-curriculum-map.md` memetakan
-setiap lab ke domain silabus CKA.
+`docs/session-lab-map.md` memetakan 16 sesi deck ke 18 lab; nomor lab sekarang sama dengan nomor
+sesi. Empat lab take-home (LAB-15..18) dikerjakan di luar jam kelas.
+`docs/cka-curriculum-map.md` memetakan setiap lab ke domain silabus CKA.
 
 ## kubectl dari laptop (opsional)
 

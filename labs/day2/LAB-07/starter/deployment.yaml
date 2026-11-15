@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web
-  namespace: cka-lab07
+  namespace: gisp-app
   labels:
     app: web
 spec:

@@ -6,7 +6,7 @@ if [[ -z "${KUBECONFIG:-}" ]]; then
   export KUBECONFIG=/root/.kube/config
 fi
 
-NS="cka-lab07"
+NS="gisp-app"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 STARTER_YAML="${SCRIPT_DIR}/../starter/deployment.yaml"
 
@@ -28,7 +28,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web
-  namespace: cka-lab07
+  namespace: gisp-app
   labels:
     app: web
 spec:

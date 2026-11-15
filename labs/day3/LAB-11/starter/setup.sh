@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# LAB-11 starter: ensure local-path StorageClass/provisioner is installed and create clean namespace cka-lab11.
+# LAB-11 starter: ensure local-path StorageClass/provisioner is installed and create clean namespace gisp-app.
 set -uo pipefail
 
 if [[ -z "${KUBECONFIG:-}" ]]; then
   export KUBECONFIG=/root/.kube/config
 fi
 
-NS="cka-lab11"
+NS="gisp-app"
 LOCAL_PATH_MANIFEST="/opt/lab/manifests/local-path.yaml"
 
 if ! kubectl get storageclass local-path >/dev/null 2>&1; then
@@ -25,8 +25,8 @@ kubectl -n local-path-storage rollout status deployment/local-path-provisioner -
 
 kubectl delete namespace "$NS" --ignore-not-found >/dev/null 2>&1 || true
 
-# Clean up any leftover PVs from previous runs whose claimRef namespace is cka-lab11
-old_pvs="$(kubectl get pv -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.claimRef.namespace}{"\n"}{end}' 2>/dev/null | awk '$1 ~ /^pvc-/ && $2 == "cka-lab11" {print $1}' || true)"
+# Clean up any leftover PVs from previous runs whose claimRef namespace is gisp-app
+old_pvs="$(kubectl get pv -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.claimRef.namespace}{"\n"}{end}' 2>/dev/null | awk '$1 ~ /^pvc-/ && $2 == "gisp-app" {print $1}' || true)"
 for pv in $old_pvs; do
   kubectl delete pv "$pv" --ignore-not-found >/dev/null 2>&1 || true
 done

@@ -5,7 +5,7 @@ nama image tidak pernah di-assert, jadi kelas boleh pakai image sendiri lewat
 `/root/lab/lab09-image.txt` (lihat `task.md` bagian BYO).
 
 1. **Deployment `demo` siap**
-   - `cka-lab09/demo` punya `readyReplicas=1` (`1/1`).
+   - `gisp-app/demo` punya `readyReplicas=1` (`1/1`).
    - Image default `docker.io/stefanprodan/podinfo:6.7.1`, `imagePullPolicy: IfNotPresent`,
      `containerPort: 9898`, label Pod `app=demo`. Nilai ini tidak dinilai verifier.
 
@@ -18,23 +18,23 @@ nama image tidak pernah di-assert, jadi kelas boleh pakai image sendiri lewat
      memuat minimal satu alamat Pod siap pakai.
 
 4. **DNS dari dalam Pod**
-   - `nslookup demo.cka-lab09.svc.cluster.local` dari pod `client` (`busybox:1.37`) mengembalikan
+   - `nslookup demo.gisp-app.svc.cluster.local` dari pod `client` (`busybox:1.37`) mengembalikan
      minimal satu A record.
 
 5. **HTTP dari dalam Pod**
-   - `wget -S -O /dev/null` ke `http://demo.cka-lab09.svc.cluster.local:9898/healthz` mengembalikan
+   - `wget -S -O /dev/null` ke `http://demo.gisp-app.svc.cluster.local:9898/healthz` mengembalikan
      status `200`.
 
 ## Output verifier saat PASS
 
 ```
 INFO: /root/lab/lab09-image.txt tidak ada -> default image=docker.io/stefanprodan/podinfo:6.7.1 port=9898 path=/healthz
-INFO: Deployment cka-lab09/demo memakai image docker.io/stefanprodan/podinfo:6.7.1 (nama image tidak dinilai)
-PASS: Deployment 'cka-lab09/demo' has readyReplicas=1 (expected: 1 ready replica)
-PASS: Service 'cka-lab09/demo' has type=ClusterIP, clusterIP=10.96.12.34, port=9898 (expected: ClusterIP on port 9898)
-PASS: Endpoints for Service 'cka-lab09/demo' list 1 ready address(es) [10.244.1.9] (expected: >=1 ready address)
-PASS: DNS lookup 'demo.cka-lab09.svc.cluster.local' from pod 'cka-lab09/client' resolved [10.96.12.34] (expected: >=1 A record)
-PASS: HTTP GET 'http://demo.cka-lab09.svc.cluster.local:9898/healthz' from pod 'cka-lab09/client' returned 200 (expected: HTTP 200)
+INFO: Deployment gisp-app/demo memakai image docker.io/stefanprodan/podinfo:6.7.1 (nama image tidak dinilai)
+PASS: Deployment 'gisp-app/demo' has readyReplicas=1 (expected: 1 ready replica)
+PASS: Service 'gisp-app/demo' has type=ClusterIP, clusterIP=10.96.12.34, port=9898 (expected: ClusterIP on port 9898)
+PASS: Endpoints for Service 'gisp-app/demo' list 1 ready address(es) [10.244.1.9] (expected: >=1 ready address)
+PASS: DNS lookup 'demo.gisp-app.svc.cluster.local' from pod 'gisp-app/client' resolved [10.96.12.34] (expected: >=1 A record)
+PASS: HTTP GET 'http://demo.gisp-app.svc.cluster.local:9898/healthz' from pod 'gisp-app/client' returned 200 (expected: HTTP 200)
 RESULT: PASS (5/5)
 ```
 
@@ -45,12 +45,12 @@ barisnya, bukan angkanya.
 
 ```
 INFO: /root/lab/lab09-image.txt tidak ada -> default image=docker.io/stefanprodan/podinfo:6.7.1 port=9898 path=/healthz
-INFO: Deployment cka-lab09/demo memakai image docker.io/stefanprodan/podinfo:6.7.1 (nama image tidak dinilai)
-PASS: Deployment 'cka-lab09/demo' has readyReplicas=1 (expected: 1 ready replica)
-FAIL: Service 'cka-lab09/demo' has type=missing, clusterIP=missing, port=missing (expected: ClusterIP on port 9898)
-FAIL: Endpoints for Service 'cka-lab09/demo' list 0 addresses [none] (expected: >=1 ready address)
-FAIL: DNS lookup 'demo.cka-lab09.svc.cluster.local' from pod 'cka-lab09/client' did not resolve (expected: >=1 A record)
-FAIL: HTTP GET 'http://demo.cka-lab09.svc.cluster.local:9898/healthz' from pod 'cka-lab09/client' returned HTTP 000 (expected: HTTP 200)
+INFO: Deployment gisp-app/demo memakai image docker.io/stefanprodan/podinfo:6.7.1 (nama image tidak dinilai)
+PASS: Deployment 'gisp-app/demo' has readyReplicas=1 (expected: 1 ready replica)
+FAIL: Service 'gisp-app/demo' has type=missing, clusterIP=missing, port=missing (expected: ClusterIP on port 9898)
+FAIL: Endpoints for Service 'gisp-app/demo' list 0 addresses [none] (expected: >=1 ready address)
+FAIL: DNS lookup 'demo.gisp-app.svc.cluster.local' from pod 'gisp-app/client' did not resolve (expected: >=1 A record)
+FAIL: HTTP GET 'http://demo.gisp-app.svc.cluster.local:9898/healthz' from pod 'gisp-app/client' returned HTTP 000 (expected: HTTP 200)
 RESULT: FAIL (1/5)
 ```
 
@@ -61,7 +61,7 @@ dalam hitungan detik, bukan menunggu 5×30 detik.
 
 Dengan `/root/lab/lab09-image.txt` berisi `image=.../api:1.4.2`, `port=8080`, `path=/healthz`, baris
 yang berubah hanya angka port dan URL pada pemeriksaan 2 dan 5 (mis.
-`http://demo.cka-lab09.svc.cluster.local:8080/healthz`), dan `RESULT: PASS (5/5)` tetap sama.
+`http://demo.gisp-app.svc.cluster.local:8080/healthz`), dan `RESULT: PASS (5/5)` tetap sama.
 Deklarasi yang tidak lengkap menambah satu baris `FAIL:` di depan (denominator menjadi `6`), dan
 verifier melanjutkan dengan default.
 

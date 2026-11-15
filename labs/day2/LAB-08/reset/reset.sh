@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # LAB-08 reset: remove the dedicated=lab:NoSchedule taint from w2, remove disk=fast label from w1,
-# and recreate namespace cka-lab08 cleanly.
+# and recreate namespace gisp-app cleanly.
 set -uo pipefail
 
 if [[ -z "${KUBECONFIG:-}" ]]; then
   export KUBECONFIG=/root/.kube/config
 fi
 
-NS="cka-lab08"
+NS="gisp-app"
 
 w1_node="$(kubectl get nodes -o name 2>/dev/null | sed 's|^node/||' | grep -E '^cka-p[0-9]+-w1$' | head -1)"
 w2_node="$(kubectl get nodes -o name 2>/dev/null | sed 's|^node/||' | grep -E '^cka-p[0-9]+-w2$' | head -1)"

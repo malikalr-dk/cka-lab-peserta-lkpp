@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# LAB-07 starter: create namespace cka-lab07 and deploy starter/deployment.yaml cleanly.
+# LAB-07 starter: create namespace gisp-app and deploy starter/deployment.yaml cleanly.
 set -uo pipefail
 
 if [[ -z "${KUBECONFIG:-}" ]]; then
   export KUBECONFIG=/root/.kube/config
 fi
 
-NS="cka-lab07"
+NS="gisp-app"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
 kubectl delete namespace "$NS" --ignore-not-found >/dev/null 2>&1 || true
@@ -20,7 +20,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web
-  namespace: cka-lab07
+  namespace: gisp-app
   labels:
     app: web
 spec:

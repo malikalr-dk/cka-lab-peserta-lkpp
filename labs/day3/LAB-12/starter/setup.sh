@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# LAB-12 starter: create empty namespace cka-lab12 and ensure cluster prerequisites
+# LAB-12 starter: create empty namespace gisp-app and ensure cluster prerequisites
 # (Traefik on NodePort 30081 and local-path StorageClass) are present locally.
 set -uo pipefail
 
@@ -7,7 +7,7 @@ if [[ -z "${KUBECONFIG:-}" ]]; then
   export KUBECONFIG=/root/.kube/config
 fi
 
-NS="cka-lab12"
+NS="gisp-app"
 TRAEFIK_NS="traefik"
 CHART="/opt/lab/charts/traefik-42.4.0.tgz"
 LOCAL_PATH_MANIFEST="/opt/lab/manifests/local-path.yaml"
@@ -49,8 +49,8 @@ fi
 
 kubectl delete namespace "$NS" --ignore-not-found >/dev/null 2>&1 || true
 
-# Remove any leftover PVs from prior runs bound to cka-lab12
-old_pvs="$(kubectl get pv -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.claimRef.namespace}{"\n"}{end}' 2>/dev/null | awk '$1 ~ /^pvc-/ && $2 == "cka-lab12" {print $1}' || true)"
+# Remove any leftover PVs from prior runs bound to gisp-app
+old_pvs="$(kubectl get pv -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.claimRef.namespace}{"\n"}{end}' 2>/dev/null | awk '$1 ~ /^pvc-/ && $2 == "gisp-app" {print $1}' || true)"
 for pv in $old_pvs; do
   kubectl delete pv "$pv" --ignore-not-found >/dev/null 2>&1 || true
 done

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# LAB-08 starter: create clean namespace cka-lab08 and ensure worker nodes do not carry leftover label/taint.
+# LAB-08 starter: create clean namespace gisp-app and ensure worker nodes do not carry leftover label/taint.
 set -uo pipefail
 
 if [[ -z "${KUBECONFIG:-}" ]]; then
   export KUBECONFIG=/root/.kube/config
 fi
 
-NS="cka-lab08"
+NS="gisp-app"
 
 w1_node="$(kubectl get nodes -o name 2>/dev/null | sed 's|^node/||' | grep -E '^cka-p[0-9]+-w1$' | head -1)"
 w2_node="$(kubectl get nodes -o name 2>/dev/null | sed 's|^node/||' | grep -E '^cka-p[0-9]+-w2$' | head -1)"

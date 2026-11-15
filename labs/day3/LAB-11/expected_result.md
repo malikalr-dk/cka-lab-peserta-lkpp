@@ -3,13 +3,13 @@
 State akhir yang dinilai `verify/verify.sh` di node `cka-pN-cp`:
 
 1. **PersistentVolumeClaim `data`:**
-   - PVC `data` ada di `cka-lab11` dengan `storageClassName: local-path` dan status `Bound`.
+   - PVC `data` ada di `gisp-app` dengan `storageClassName: local-path` dan status `Bound`.
 
 2. **PersistentVolume & `claimRef`:**
-   - PV di balik PVC `data` ada di kluster; `spec.claimRef` menunjuk ke `cka-lab11/data`.
+   - PV di balik PVC `data` ada di kluster; `spec.claimRef` menunjuk ke `gisp-app/data`.
 
 3. **Pod `reader` & Persistensi File `/data/proof.txt`:**
-   - Pod `reader` jalan di `cka-lab11`, mount PVC `data` di `/data`; isi `/data/proof.txt` = `hello-cka`.
+   - Pod `reader` jalan di `gisp-app`, mount PVC `data` di `/data`; isi `/data/proof.txt` = `hello-cka`.
 
 4. **File Jawaban `/root/lab/lab11-answer.txt`:**
    - File `/root/lab/lab11-answer.txt` ada dan mencantumkan nama PV (`pvc-...`) yang cocok.

@@ -8,7 +8,7 @@ if [[ -z "${KUBECONFIG:-}" ]]; then
   printf 'INFO: KUBECONFIG not set; falling back to %s\n' "$KUBECONFIG"
 fi
 
-NS="cka-lab08"
+NS="gisp-app"
 
 passed=0
 total=0
@@ -27,7 +27,7 @@ fail() {
 w1_node="$(kubectl get nodes -o name 2>/dev/null | sed 's|^node/||' | grep -E '^cka-p[0-9]+-w1$' | head -1)"
 w2_node="$(kubectl get nodes -o name 2>/dev/null | sed 's|^node/||' | grep -E '^cka-p[0-9]+-w2$' | head -1)"
 
-# 1. Pod config-demo is Running in cka-lab08
+# 1. Pod config-demo is Running in gisp-app
 cfg_phase="$(kubectl -n "$NS" get pod config-demo -o jsonpath='{.status.phase}' 2>/dev/null || true)"
 if [[ "$cfg_phase" == "Running" ]]; then
   pass "Pod '${NS}/config-demo' phase is '${cfg_phase}' (expected: 'Running')"

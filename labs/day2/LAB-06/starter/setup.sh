@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# LAB-06 starter: create a clean cka-lab06 namespace and remove any leftover cluster-scoped bindings for dev-sa.
+# LAB-06 starter: create a clean gisp-app namespace and remove any leftover cluster-scoped bindings for dev-sa.
 set -uo pipefail
 
 if [[ -z "${KUBECONFIG:-}" ]]; then
   export KUBECONFIG=/root/.kube/config
 fi
 
-NS="cka-lab06"
+NS="gisp-app"
 
-# Remove any ClusterRoleBindings that reference system:serviceaccount:cka-lab06:dev-sa and their ClusterRoles
-crbs="$(kubectl get clusterrolebinding -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .subjects[*]}{.namespace}/{.name}{" "}{end}{.roleRef.name}{"\n"}{end}' 2>/dev/null | awk '/cka-lab06\/dev-sa/ {print $1 ":" $NF}' || true)"
+# Remove any ClusterRoleBindings that reference system:serviceaccount:gisp-app:dev-sa and their ClusterRoles
+crbs="$(kubectl get clusterrolebinding -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .subjects[*]}{.namespace}/{.name}{" "}{end}{.roleRef.name}{"\n"}{end}' 2>/dev/null | awk '/gisp-app\/dev-sa/ {print $1 ":" $NF}' || true)"
 for entry in $crbs; do
   crb_name="${entry%%:*}"
   cr_name="${entry##*:}"

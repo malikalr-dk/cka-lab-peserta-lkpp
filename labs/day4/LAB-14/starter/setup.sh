@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# LAB-14 starter: write Kustomize base + dev/prod overlays and a local Helm chart lab17-web
-# under /root/lab17/, clean up prior lab namespaces/releases, and verify the local nginx image cache.
+# LAB-14 starter: write the local Helm chart lab17-web under /root/lab17/,
+# clean up the Helm namespace, and install kube-prometheus-stack from the local chart
+# into lab-monitoring so the monitoring part needs no internet.
 set -uo pipefail
 
 if [[ -z "${KUBECONFIG:-}" ]]; then
@@ -8,133 +9,15 @@ if [[ -z "${KUBECONFIG:-}" ]]; then
 fi
 
 LAB_DIR="/root/lab17"
-NS_DEV="lab17"
-NS_PROD="lab17-prod"
-NS_HELM="lab17-helm"
+NS_HELM="gisp-app"
+NS_MON="lab-monitoring"
 RELEASE="lab17-web"
+MON_RELEASE="kube-prometheus"
+MON_CHART="/opt/lab/charts/kube-prometheus-stack-93.3.0.tgz"
 
-printf 'INFO: preparing working directory %s...\n' "$LAB_DIR"
+printf 'INFO: menyiapkan %s/chart/lab17-web...\n' "$LAB_DIR"
 rm -rf "$LAB_DIR"
-mkdir -p \
-  "${LAB_DIR}/base" \
-  "${LAB_DIR}/overlays/dev" \
-  "${LAB_DIR}/overlays/prod" \
-  "${LAB_DIR}/chart/lab17-web/templates"
-
-cat <<'EOF' > "${LAB_DIR}/base/kustomization.yaml"
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  - configmap.yaml
-  - deployment.yaml
-  - service.yaml
-EOF
-
-cat <<'EOF' > "${LAB_DIR}/base/configmap.yaml"
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: web-config
-  labels:
-    app: web
-data:
-  APP_ENV: "base"
-  LOG_LEVEL: "info"
-EOF
-
-cat <<'EOF' > "${LAB_DIR}/base/deployment.yaml"
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: web
-  labels:
-    app: web
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: web
-  template:
-    metadata:
-      labels:
-        app: web
-    spec:
-      containers:
-        - name: nginx
-          image: nginx:1.27-alpine
-          imagePullPolicy: IfNotPresent
-          ports:
-            - name: http
-              containerPort: 80
-          envFrom:
-            - configMapRef:
-                name: web-config
-EOF
-
-cat <<'EOF' > "${LAB_DIR}/base/service.yaml"
-apiVersion: v1
-kind: Service
-metadata:
-  name: web
-  labels:
-    app: web
-spec:
-  type: ClusterIP
-  selector:
-    app: web
-  ports:
-    - name: http
-      port: 80
-      targetPort: 80
-EOF
-
-cat <<'EOF' > "${LAB_DIR}/overlays/dev/kustomization.yaml"
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-namespace: lab17
-namePrefix: dev-
-labels:
-  - pairs:
-      env: dev
-    includeTemplates: true
-resources:
-  - ../../base
-EOF
-
-cat <<'EOF' > "${LAB_DIR}/overlays/prod/kustomization.yaml"
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-namespace: lab17-prod
-namePrefix: prod-
-labels:
-  - pairs:
-      env: prod
-    includeTemplates: true
-resources:
-  - ../../base
-patches:
-  - path: patch-replicas-limits.yaml
-EOF
-
-cat <<'EOF' > "${LAB_DIR}/overlays/prod/patch-replicas-limits.yaml"
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: web
-spec:
-  replicas: 3
-  template:
-    spec:
-      containers:
-        - name: nginx
-          resources:
-            requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              cpu: 200m
-              memory: 128Mi
-EOF
+mkdir -p "${LAB_DIR}/chart/lab17-web/templates"
 
 cat <<'EOF' > "${LAB_DIR}/chart/lab17-web/Chart.yaml"
 apiVersion: v2
@@ -210,23 +93,49 @@ spec:
       protocol: TCP
 EOF
 
-printf 'INFO: uninstalling any existing Helm release %s in %s...\n' "$RELEASE" "$NS_HELM"
+printf 'INFO: membersihkan rilis dan namespace %s...\n' "$NS_HELM"
 helm uninstall "$RELEASE" -n "$NS_HELM" --ignore-not-found >/dev/null 2>&1 || true
+kubectl delete namespace "$NS_HELM" --ignore-not-found >/dev/null 2>&1 || true
+for _ in $(seq 1 60); do
+  kubectl get namespace "$NS_HELM" >/dev/null 2>&1 || break
+  sleep 2
+done
+kubectl create namespace "$NS_HELM" >/dev/null 2>&1 || true
 
-printf 'INFO: cleaning up namespaces %s, %s, %s if present...\n' "$NS_DEV" "$NS_PROD" "$NS_HELM"
-kubectl delete namespace "$NS_DEV" "$NS_PROD" "$NS_HELM" --ignore-not-found >/dev/null 2>&1 || true
-
-# Recreate empty target namespaces for Kustomize overlays so 'kubectl apply -k' works directly
-kubectl create namespace "$NS_DEV" >/dev/null 2>&1 || true
-kubectl create namespace "$NS_PROD" >/dev/null 2>&1 || true
-
-printf 'INFO: checking local CRI image cache for nginx:1.27-alpine...\n'
-if crictl images 2>/dev/null | grep -q 'nginx.*1\.27-alpine'; then
-  printf 'READY: cached image nginx:1.27-alpine verified in containerd via crictl images\n'
-else
-  printf 'INFO: nginx:1.27-alpine not matched in local crictl output (continuing)\n'
+# --- monitoring: pasang dari chart lokal, tanpa internet -------------------------------------
+if [[ ! -f "$MON_CHART" ]]; then
+  printf 'FAIL: chart monitoring tidak ada: %s\n' "$MON_CHART" >&2
+  exit 1
 fi
 
-printf 'READY: Kustomize tree written to %s/{base,overlays/dev,overlays/prod}\n' "$LAB_DIR"
-printf 'READY: Local Helm chart written to %s/chart/lab17-web\n' "$LAB_DIR"
-printf 'READY: LAB-14 environment initialized\n'
+printf 'INFO: memasang kube-prometheus-stack di %s dari %s (maks 8 menit)...\n' "$NS_MON" "$MON_CHART"
+if ! helm upgrade --install "$MON_RELEASE" "$MON_CHART" -n "$NS_MON" --create-namespace \
+  --set alertmanager.enabled=false \
+  --set prometheus.prometheusSpec.retention=2h \
+  --set prometheus.prometheusSpec.resources.requests.memory=256Mi \
+  --set grafana.resources.requests.memory=128Mi >/tmp/lab14-monitoring.log 2>&1; then
+  printf 'FAIL: helm install kube-prometheus-stack gagal (lihat /tmp/lab14-monitoring.log)\n' >&2
+  tail -5 /tmp/lab14-monitoring.log >&2 || true
+  exit 1
+fi
+
+printf 'INFO: menunggu Prometheus dan Grafana siap...\n'
+mon_ok=0
+for _ in $(seq 1 80); do
+  prom="$(kubectl -n "$NS_MON" get statefulset prometheus-kube-prometheus-prometheus -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+  graf="$(kubectl -n "$NS_MON" get deployment "$MON_RELEASE-grafana" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+  if [[ "${prom:-0}" -ge 1 && "${graf:-0}" -ge 1 ]]; then
+    mon_ok=1
+    break
+  fi
+  sleep 6
+done
+if [[ "$mon_ok" -ne 1 ]]; then
+  printf 'FAIL: monitoring belum siap (prometheus=%s grafana=%s). Cek: kubectl -n %s get pods\n' \
+    "${prom:-0}" "${graf:-0}" "$NS_MON" >&2
+  exit 1
+fi
+
+printf 'READY: chart lab17-web ada di %s/chart/lab17-web\n' "$LAB_DIR"
+printf 'READY: monitoring %s jalan di %s (Prometheus + Grafana)\n' "$MON_RELEASE" "$NS_MON"
+printf 'READY: LAB-14 siap (Helm + monitoring)\n'

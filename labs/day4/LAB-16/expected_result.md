@@ -1,10 +1,10 @@
 # Expected Result — LAB-16
 
 1. **Deployment `portal` kembali 2 replika dan Ready:**
-   - `kubectl -n cka-lab16 get deployment portal` → `spec.replicas=2`, `READY 2/2`.
+   - `kubectl -n gisp-app get deployment portal` → `spec.replicas=2`, `READY 2/2`.
 
 2. **Service `portal` punya dua endpoint:**
-   - `kubectl -n cka-lab16 get endpoints portal` → dua alamat IP.
+   - `kubectl -n gisp-app get endpoints portal` → dua alamat IP.
 
 3. **Ingress menunjuk port yang benar:**
    - `portal-ingress` backend `portal:80` (bukan `8080`).

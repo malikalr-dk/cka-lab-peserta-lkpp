@@ -6,9 +6,9 @@ Cakupan domain CKA: Troubleshooting (30%), Workloads & Scheduling (15%), Service
 
 ## Konteks & State Awal
 
-- Namespace `cka-lab16` berisi aplikasi `portal` yang tidak melayani trafik. Dua hal rusak: jumlah replika Deployment dan port pada Ingress.
+- Namespace `gisp-app` berisi aplikasi `portal` yang tidak melayani trafik. Dua hal rusak: jumlah replika Deployment dan port pada Ingress.
 - Namespace, ConfigMap, PVC, dan Service sudah ada. Jangan membuat ulang dari nol.
-- Pemeriksaan awal: `kubectl -n cka-lab16 get deploy,svc,ingress,pods` dan `curl -H 'Host: portal.lab.local' http://localhost:30081/`.
+- Pemeriksaan awal: `kubectl -n gisp-app get deploy,svc,ingress,pods` dan `curl -H 'Host: portal.lab.local' http://localhost:30081/`.
 
 ## Batasan
 

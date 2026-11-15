@@ -8,7 +8,7 @@ if [[ -z "${KUBECONFIG:-}" ]]; then
   printf 'INFO: KUBECONFIG not set; falling back to %s\n' "$KUBECONFIG"
 fi
 
-NS="cka-lab06"
+NS="gisp-app"
 SA_NAME="dev-sa"
 SA_USER="system:serviceaccount:${NS}:${SA_NAME}"
 
@@ -26,14 +26,14 @@ fail() {
   printf 'FAIL: %s\n' "$*"
 }
 
-# 1. ServiceAccount dev-sa exists in cka-lab06
+# 1. ServiceAccount dev-sa exists in gisp-app
 if kubectl -n "$NS" get sa "$SA_NAME" >/dev/null 2>&1; then
   pass "ServiceAccount '${NS}/${SA_NAME}' exists (expected: present)"
 else
   fail "ServiceAccount '${NS}/${SA_NAME}' does not exist (expected: present)"
 fi
 
-# 2. can-i list pods -n cka-lab06 -> yes
+# 2. can-i list pods -n gisp-app -> yes
 ans="$(kubectl auth can-i list pods -n "$NS" --as="$SA_USER" 2>/dev/null | tr -d '[:space:]' || true)"
 if [[ "$ans" == "yes" ]]; then
   pass "auth can-i 'list pods -n ${NS}' as '${SA_USER}' returned '${ans}' (expected: 'yes')"
@@ -41,7 +41,7 @@ else
   fail "auth can-i 'list pods -n ${NS}' as '${SA_USER}' returned '${ans:-error}' (expected: 'yes')"
 fi
 
-# 3. can-i delete pods -n cka-lab06 -> no
+# 3. can-i delete pods -n gisp-app -> no
 ans="$(kubectl auth can-i delete pods -n "$NS" --as="$SA_USER" 2>/dev/null | tr -d '[:space:]' || true)"
 if [[ "$ans" == "no" ]]; then
   pass "auth can-i 'delete pods -n ${NS}' as '${SA_USER}' returned '${ans}' (expected: 'no')"
@@ -65,7 +65,7 @@ else
   fail "auth can-i 'list nodes' as '${SA_USER}' returned '${ans:-error}' (expected: 'yes')"
 fi
 
-# 6. can-i get secrets -n cka-lab06 -> no
+# 6. can-i get secrets -n gisp-app -> no
 ans="$(kubectl auth can-i get secrets -n "$NS" --as="$SA_USER" 2>/dev/null | tr -d '[:space:]' || true)"
 if [[ "$ans" == "no" ]]; then
   pass "auth can-i 'get secrets -n ${NS}' as '${SA_USER}' returned '${ans}' (expected: 'no')"
@@ -73,7 +73,7 @@ else
   fail "auth can-i 'get secrets -n ${NS}' as '${SA_USER}' returned '${ans:-error}' (expected: 'no')"
 fi
 
-# 7. Role in cka-lab06 exists and its rules do not use '*' verbs or '*' resources
+# 7. Role in gisp-app exists and its rules do not use '*' verbs or '*' resources
 role_names="$(kubectl -n "$NS" get role -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true)"
 role_verbs="$(kubectl -n "$NS" get role -o jsonpath='{.items[*].rules[*].verbs[*]}' 2>/dev/null || true)"
 role_resources="$(kubectl -n "$NS" get role -o jsonpath='{.items[*].rules[*].resources[*]}' 2>/dev/null || true)"

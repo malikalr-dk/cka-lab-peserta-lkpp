@@ -9,7 +9,7 @@ if [[ -z "${KUBECONFIG:-}" ]]; then
   export KUBECONFIG=/root/.kube/config
 fi
 
-NS="cka-lab16"
+NS="gisp-app"
 TRAEFIK_NS="traefik"
 CHART="/opt/lab/charts/traefik-42.4.0.tgz"
 LOCAL_PATH_MANIFEST="/opt/lab/manifests/local-path.yaml"

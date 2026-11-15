@@ -11,7 +11,7 @@ if [[ -z "${KUBECONFIG:-}" ]]; then
   printf 'INFO: KUBECONFIG not set; falling back to %s\n' "$KUBECONFIG"
 fi
 
-NS="cka-lab09"
+NS="gisp-app"
 DECL="/root/lab/lab09-image.txt"
 DEF_IMAGE="docker.io/stefanprodan/podinfo:6.7.1"
 DEF_PORT="9898"

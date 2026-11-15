@@ -8,7 +8,7 @@ if [[ -z "${KUBECONFIG:-}" ]]; then
   printf 'INFO: KUBECONFIG not set; falling back to %s\n' "$KUBECONFIG"
 fi
 
-NS="cka-lab10"
+NS="gisp-app"
 TRAEFIK_NS="traefik"
 
 passed=0
@@ -41,7 +41,7 @@ else
   fail "Traefik controller in namespace '${TRAEFIK_NS}' has ${traefik_running:-0} Running pod(s) (expected: >=1)"
 fi
 
-# 2. Deployment 'app' and Service 'app' exist and are ready in cka-lab10
+# 2. Deployment 'app' and Service 'app' exist and are ready in gisp-app
 app_ready="$(kubectl -n "$NS" get deployment app -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
 svc_port="$(kubectl -n "$NS" get svc app -o jsonpath='{.spec.ports[0].port}' 2>/dev/null || true)"
 if [[ "${app_ready:-0}" -eq 2 && "$svc_port" == "80" ]]; then

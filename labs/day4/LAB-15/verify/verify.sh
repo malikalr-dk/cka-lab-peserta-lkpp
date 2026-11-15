@@ -8,7 +8,7 @@ if [[ -z "${KUBECONFIG:-}" ]]; then
   printf 'INFO: KUBECONFIG tidak diset; memakai %s\n' "$KUBECONFIG"
 fi
 
-NS="cka-lab15"
+NS="gisp-app"
 PORT=30081
 passed=0
 total=0

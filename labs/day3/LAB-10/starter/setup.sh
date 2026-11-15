@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # LAB-10 starter: install Traefik from the local chart on NodePort 30081 (if not already configured)
-# and create namespace cka-lab10 with Deployment app, Service app, and broken-ingress.
+# and create namespace gisp-app with Deployment app, Service app, and broken-ingress.
 set -uo pipefail
 
 if [[ -z "${KUBECONFIG:-}" ]]; then
   export KUBECONFIG=/root/.kube/config
 fi
 
-NS="cka-lab10"
+NS="gisp-app"
 TRAEFIK_NS="traefik"
 CHART="/opt/lab/charts/traefik-42.4.0.tgz"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
@@ -46,7 +46,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: app
-  namespace: cka-lab10
+  namespace: gisp-app
   labels:
     app: app
 spec:
@@ -70,7 +70,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: app
-  namespace: cka-lab10
+  namespace: gisp-app
   labels:
     app: app
 spec:
@@ -86,7 +86,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: broken-ingress
-  namespace: cka-lab10
+  namespace: gisp-app
 spec:
   ingressClassName: traefik
   rules:

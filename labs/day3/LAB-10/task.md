@@ -5,7 +5,7 @@ Tujuan: ekspos HTTP lewat `Ingress` Traefik dan perbaiki `broken-ingress` dengan
 ## Konteks & State Awal
 
 - Starter sudah pasang **Traefik** di namespace `traefik` dari chart lokal `/opt/lab/charts/traefik-42.4.0.tgz`; `Service` `NodePort` HTTP di **NodePort `30081`** (`http://localhost:30081/`).
-- Starter sudah siapkan namespace `cka-lab10` berisi:
+- Starter sudah siapkan namespace `gisp-app` berisi:
   - `Deployment` `app` (`nginx:1.27-alpine`, `2` replika, `imagePullPolicy: IfNotPresent`).
   - `Service` `app` port `80`.
   - `Ingress` `broken-ingress` host `broken.lab.local` yang rusak (error saat diakses).
@@ -13,7 +13,7 @@ Tujuan: ekspos HTTP lewat `Ingress` Traefik dan perbaiki `broken-ingress` dengan
 ## Tugas
 
 1. **Buat Ingress baru (`app-ingress`):**
-   - Di `cka-lab10`, buat `Ingress` `app-ingress` (`ingressClassName: traefik`) dengan:
+   - Di `gisp-app`, buat `Ingress` `app-ingress` (`ingressClassName: traefik`) dengan:
      - Host: `app.lab.local`
      - Path: `/` (`pathType: Prefix`)
      - Backend: `Service` `app` port `80`
@@ -24,9 +24,9 @@ Tujuan: ekspos HTTP lewat `Ingress` Traefik dan perbaiki `broken-ingress` dengan
    - Uji akses awal:
      `curl -i -s -H 'Host: broken.lab.local' http://localhost:30081/`
    - **Penting:** Jangan tebak-tebakan. Cari salah konfigurasi lewat:
-     - `kubectl -n cka-lab10 describe ingress broken-ingress`
-     - `kubectl -n cka-lab10 get svc,endpoints`
+     - `kubectl -n gisp-app describe ingress broken-ingress`
+     - `kubectl -n gisp-app get svc,endpoints`
      - `kubectl -n traefik logs -l app.kubernetes.io/name=traefik`
-   - Perbaiki `Ingress` `broken-ingress` di `cka-lab10` agar mengarah ke `Service` dan port yang benar.
+   - Perbaiki `Ingress` `broken-ingress` di `gisp-app` agar mengarah ke `Service` dan port yang benar.
    - Setelah perbaikan, perintah ini harus balas `HTTP 200` (halaman nginx):
      `curl -s -H 'Host: broken.lab.local' http://localhost:30081/`

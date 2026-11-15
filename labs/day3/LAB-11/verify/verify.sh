@@ -8,7 +8,7 @@ if [[ -z "${KUBECONFIG:-}" ]]; then
   printf 'INFO: KUBECONFIG not set; falling back to %s\n' "$KUBECONFIG"
 fi
 
-NS="cka-lab11"
+NS="gisp-app"
 PVC_NAME="data"
 READER_POD="reader"
 ANSWER_FILE="/root/lab/lab11-answer.txt"
@@ -34,7 +34,7 @@ else
   fail "StorageClass 'local-path' does not exist (expected: present)"
 fi
 
-# 2. PVC 'data' in cka-lab11 exists and is Bound
+# 2. PVC 'data' in gisp-app exists and is Bound
 pvc_phase="$(kubectl -n "$NS" get pvc "$PVC_NAME" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
 pvc_sc="$(kubectl -n "$NS" get pvc "$PVC_NAME" -o jsonpath='{.spec.storageClassName}' 2>/dev/null || true)"
 pv_name="$(kubectl -n "$NS" get pvc "$PVC_NAME" -o jsonpath='{.spec.volumeName}' 2>/dev/null || true)"
@@ -44,10 +44,10 @@ else
   fail "PersistentVolumeClaim '${NS}/${PVC_NAME}' has phase='${pvc_phase:-missing}', storageClassName='${pvc_sc:-missing}', volumeName='${pv_name:-none}' (expected: Bound on local-path)"
 fi
 
-# 3. PV behind 'data' exists and its claimRef matches cka-lab11/data
-# If PVC was deleted during a Retain demonstration, fall back to searching PVs with claimRef cka-lab11/data
+# 3. PV behind 'data' exists and its claimRef matches gisp-app/data
+# If PVC was deleted during a Retain demonstration, fall back to searching PVs with claimRef gisp-app/data
 if [[ -z "$pv_name" ]]; then
-  pv_name="$(kubectl get pv -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.claimRef.namespace}/{.spec.claimRef.name}{"\n"}{end}' 2>/dev/null | awk '$2 == "cka-lab11/data" {print $1; exit}' || true)"
+  pv_name="$(kubectl get pv -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.claimRef.namespace}/{.spec.claimRef.name}{"\n"}{end}' 2>/dev/null | awk '$2 == "gisp-app/data" {print $1; exit}' || true)"
 fi
 pv_claim_ns="$(kubectl get pv "${pv_name:-none}" -o jsonpath='{.spec.claimRef.namespace}' 2>/dev/null || true)"
 pv_claim_name="$(kubectl get pv "${pv_name:-none}" -o jsonpath='{.spec.claimRef.name}' 2>/dev/null || true)"

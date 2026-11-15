@@ -1,82 +1,35 @@
 #!/usr/bin/env bash
-# LAB-14 verifier: Kustomize overlays (dev + prod) and Helm chart lifecycle (install, upgrade, rollback, upgrade)
-# Deliberately not 'set -e': a failing assertion must print, not abort.
+# LAB-14 verifier: Helm release lifecycle (install -> upgrade -> rollback -> upgrade) plus
+# a live Prometheus/Grafana stack installed from the local chart.
 set -uo pipefail
 
 if [[ -z "${KUBECONFIG:-}" ]]; then
   export KUBECONFIG=/root/.kube/config
-  printf 'INFO: KUBECONFIG not set; falling back to %s\n' "$KUBECONFIG"
+  printf 'INFO: KUBECONFIG tidak diset; memakai %s\n' "$KUBECONFIG"
 fi
 
-NS_DEV="lab17"
-NS_PROD="lab17-prod"
-NS_HELM="lab17-helm"
+NS_HELM="gisp-app"
+NS_MON="lab-monitoring"
 RELEASE="lab17-web"
-REPORT_FILE="/root/lab17/report.txt"
-
+MON_RELEASE="kube-prometheus"
+REPORT="/root/lab17/report.txt"
 passed=0
 total=0
 
-pass() {
-  passed=$((passed + 1))
-  total=$((total + 1))
-  printf 'PASS: %s\n' "$*"
-}
+pass() { passed=$((passed + 1)); total=$((total + 1)); printf 'PASS: %s\n' "$*"; }
+fail() { total=$((total + 1)); printf 'FAIL: %s\n' "$*"; }
 
-fail() {
-  total=$((total + 1))
-  printf 'FAIL: %s\n' "$*"
-}
-
-# 1. Deployment 'dev-web' in namespace 'lab17' is Running/available with 1 replica and carries env=dev label
-dev_ready=""
-for _ in $(seq 1 15); do
-  dev_ready="$(kubectl -n "$NS_DEV" get deployment dev-web -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
-  [[ "${dev_ready:-0}" -eq 1 ]] && break
-  sleep 2
-done
-dev_spec_rep="$(kubectl -n "$NS_DEV" get deployment dev-web -o jsonpath='{.spec.replicas}' 2>/dev/null || true)"
-dev_env_lbl="$(kubectl -n "$NS_DEV" get deployment dev-web -o jsonpath='{.metadata.labels.env}' 2>/dev/null || true)"
-if [[ "${dev_spec_rep:-0}" -eq 1 && "${dev_ready:-0}" -eq 1 && "$dev_env_lbl" == "dev" ]]; then
-  pass "Deployment '${NS_DEV}/dev-web' is available with replicas=${dev_spec_rep}, readyReplicas=${dev_ready}, label env=${dev_env_lbl} (expected: 1 ready replica, env=dev)"
-else
-  fail "Deployment '${NS_DEV}/dev-web' has replicas=${dev_spec_rep:-missing}, readyReplicas=${dev_ready:-0}, label env=${dev_env_lbl:-missing} (expected: 1 ready replica, env=dev)"
-fi
-
-# 2. Deployment 'prod-web' from the prod overlay in 'lab17-prod' has 3 ready replicas
-prod_ready=""
-for _ in $(seq 1 15); do
-  prod_ready="$(kubectl -n "$NS_PROD" get deployment prod-web -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
-  [[ "${prod_ready:-0}" -eq 3 ]] && break
-  sleep 2
-done
-prod_spec_rep="$(kubectl -n "$NS_PROD" get deployment prod-web -o jsonpath='{.spec.replicas}' 2>/dev/null || true)"
-if [[ "${prod_spec_rep:-0}" -eq 3 && "${prod_ready:-0}" -eq 3 ]]; then
-  pass "Deployment '${NS_PROD}/prod-web' has replicas=${prod_spec_rep} and readyReplicas=${prod_ready} (expected: 3 ready replicas)"
-else
-  fail "Deployment '${NS_PROD}/prod-web' has replicas=${prod_spec_rep:-missing} and readyReplicas=${prod_ready:-0} (expected: 3 ready replicas)"
-fi
-
-# 3. Prod Deployment carries resources.limits.cpu from the patch and dev Deployment does not
-prod_limit_cpu="$(kubectl -n "$NS_PROD" get deployment prod-web -o jsonpath='{.spec.template.spec.containers[0].resources.limits.cpu}' 2>/dev/null || true)"
-dev_limit_cpu="$(kubectl -n "$NS_DEV" get deployment dev-web -o jsonpath='{.spec.template.spec.containers[0].resources.limits.cpu}' 2>/dev/null || true)"
-if [[ -n "$prod_limit_cpu" && -z "$dev_limit_cpu" ]]; then
-  pass "Overlay resource limits verified: '${NS_PROD}/prod-web' limits.cpu='${prod_limit_cpu}' and '${NS_DEV}/dev-web' limits.cpu is unset (expected: prod has limits.cpu, dev has none)"
-else
-  fail "Overlay resource limits mismatch: '${NS_PROD}/prod-web' limits.cpu='${prod_limit_cpu:-empty}', '${NS_DEV}/dev-web' limits.cpu='${dev_limit_cpu:-empty}' (expected: prod non-empty, dev empty)"
-fi
-
-# 4. 'helm -n lab17-helm status lab17-web' shows STATUS: deployed and revision >= 2
+# 1. Rilis Helm deployed, REVISION >= 2
 helm_status_out="$(helm -n "$NS_HELM" status "$RELEASE" 2>/dev/null || true)"
 helm_status="$(printf '%s\n' "$helm_status_out" | awk -F': ' '/^STATUS:/ {print $2; exit}' | tr -d '[:space:]')"
 helm_rev="$(printf '%s\n' "$helm_status_out" | awk -F': ' '/^REVISION:/ {print $2; exit}' | tr -d '[:space:]')"
 if [[ "$helm_status" == "deployed" && "${helm_rev:-0}" =~ ^[0-9]+$ && "${helm_rev:-0}" -ge 2 ]]; then
-  pass "Helm release '${NS_HELM}/${RELEASE}' has STATUS=${helm_status} and REVISION=${helm_rev} (expected: deployed, revision >= 2)"
+  pass "Helm release '${NS_HELM}/${RELEASE}' STATUS=${helm_status}, REVISION=${helm_rev} (expected: deployed, revision >= 2)"
 else
-  fail "Helm release '${NS_HELM}/${RELEASE}' has STATUS='${helm_status:-missing}' and REVISION='${helm_rev:-missing}' (expected: deployed, revision >= 2)"
+  fail "Helm release '${NS_HELM}/${RELEASE}' STATUS='${helm_status:-missing}', REVISION='${helm_rev:-missing}' (expected: deployed, revision >= 2)"
 fi
 
-# 5. The Helm-managed Deployment has replicas=2 (and readyReplicas=2) as set by the last helm upgrade
+# 2. Deployment hasil Helm: 2 replika Ready
 helm_dep_ready=""
 for _ in $(seq 1 15); do
   helm_dep_ready="$(kubectl -n "$NS_HELM" get deployment "$RELEASE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
@@ -84,29 +37,62 @@ for _ in $(seq 1 15); do
   sleep 2
 done
 helm_dep_rep="$(kubectl -n "$NS_HELM" get deployment "$RELEASE" -o jsonpath='{.spec.replicas}' 2>/dev/null || true)"
-if [[ "${helm_dep_rep:-0}" -eq 2 && "${helm_dep_ready:-0}" -eq 2 ]]; then
-  pass "Helm-managed Deployment '${NS_HELM}/${RELEASE}' has spec.replicas=${helm_dep_rep} and readyReplicas=${helm_dep_ready} (expected: 2)"
+if [[ "${helm_dep_rep:-0}" == "2" && "${helm_dep_ready:-0}" -eq 2 ]]; then
+  pass "Helm-managed Deployment '${NS_HELM}/${RELEASE}' has replicas=${helm_dep_ready}/${helm_dep_rep} (expected: 2/2 Ready)"
 else
-  fail "Helm-managed Deployment '${NS_HELM}/${RELEASE}' has spec.replicas=${helm_dep_rep:-missing} and readyReplicas=${helm_dep_ready:-0} (expected: 2)"
+  fail "Helm-managed Deployment '${NS_HELM}/${RELEASE}' has replicas=${helm_dep_ready:-0}/${helm_dep_rep:-0} (expected: 2/2 Ready)"
 fi
 
-# 6. /root/lab17/report.txt has both keys with non-empty values and kustomize_prod_replicas matches live object
-if [[ -f "$REPORT_FILE" ]]; then
-  rep_prod="$(awk -F'=' '/^kustomize_prod_replicas=/ {print $2; exit}' "$REPORT_FILE" | tr -d '[:space:]')"
-  rep_helm="$(awk -F'=' '/^helm_revision=/ {print $2; exit}' "$REPORT_FILE" | tr -d '[:space:]')"
-  if [[ -n "$rep_prod" && -n "$rep_helm" && "$rep_prod" == "${prod_spec_rep:-3}" && "${prod_spec_rep:-0}" -eq 3 ]]; then
-    pass "Report '${REPORT_FILE}' contains kustomize_prod_replicas=${rep_prod} (matches live prod-web=${prod_spec_rep}) and helm_revision=${rep_helm}"
-  else
-    fail "Report '${REPORT_FILE}' has kustomize_prod_replicas='${rep_prod:-missing}' (live='${prod_spec_rep:-missing}') and helm_revision='${rep_helm:-missing}' (expected: both non-empty and matching live prod replicas=3)"
-  fi
+# 3. Rilis monitoring terpasang
+mon_status="$(helm -n "$NS_MON" status "$MON_RELEASE" 2>/dev/null | awk -F': ' '/^STATUS:/ {print $2; exit}' | tr -d '[:space:]')"
+if [[ "$mon_status" == "deployed" ]]; then
+  pass "Monitoring release '${NS_MON}/${MON_RELEASE}' STATUS=${mon_status} (expected: deployed)"
 else
-  fail "Report file '${REPORT_FILE}' does not exist (expected: kustomize_prod_replicas=<n> and helm_revision=<n>)"
+  fail "Monitoring release '${NS_MON}/${MON_RELEASE}' STATUS='${mon_status:-missing}' (expected: deployed)"
+fi
+
+# 4. Prometheus siap
+prom_ready=""
+for _ in $(seq 1 20); do
+  prom_ready="$(kubectl -n "$NS_MON" get statefulset prometheus-${MON_RELEASE}-prometheus -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+  [[ "${prom_ready:-0}" -ge 1 ]] && break
+  sleep 6
+done
+if [[ "${prom_ready:-0}" -ge 1 ]]; then
+  pass "Prometheus '${NS_MON}/prometheus-${MON_RELEASE}-prometheus' has ${prom_ready} ready replica (expected: >= 1)"
+else
+  fail "Prometheus '${NS_MON}/prometheus-${MON_RELEASE}-prometheus' has ${prom_ready:-0} ready replicas (expected: >= 1)"
+fi
+
+# 5. Grafana siap
+graf_ready=""
+for _ in $(seq 1 20); do
+  graf_ready="$(kubectl -n "$NS_MON" get deployment "${MON_RELEASE}-grafana" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+  [[ "${graf_ready:-0}" -ge 1 ]] && break
+  sleep 6
+done
+if [[ "${graf_ready:-0}" -ge 1 ]]; then
+  pass "Grafana '${NS_MON}/${MON_RELEASE}-grafana' has ${graf_ready} ready replica (expected: >= 1)"
+else
+  fail "Grafana '${NS_MON}/${MON_RELEASE}-grafana' has ${graf_ready:-0} ready replicas (expected: >= 1)"
+fi
+
+# 6. Laporan: helm_revision cocok rilis hidup, prometheus_ready=yes
+rep_rev=""
+rep_mon=""
+if [[ -f "$REPORT" ]]; then
+  rep_rev="$(awk -F'=' '/^helm_revision=/ {print $2; exit}' "$REPORT" | tr -d '[:space:]')"
+  rep_mon="$(awk -F'=' '/^prometheus_ready=/ {print $2; exit}' "$REPORT" | tr -d '[:space:]')"
+fi
+if [[ -n "$helm_rev" && "$rep_rev" == "$helm_rev" && "$rep_mon" == "yes" ]]; then
+  pass "Report '${REPORT}' has helm_revision=${rep_rev} (matches live) and prometheus_ready=${rep_mon} (expected: ${helm_rev}, yes)"
+else
+  fail "Report '${REPORT}' has helm_revision='${rep_rev:-missing}' (live=${helm_rev:-0}), prometheus_ready='${rep_mon:-missing}' (expected: ${helm_rev:-?}, yes)"
 fi
 
 if [[ "$passed" -eq "$total" ]]; then
   printf 'RESULT: PASS (%d/%d)\n' "$passed" "$total"
   exit 0
-else
-  printf 'RESULT: FAIL (%d/%d)\n' "$passed" "$total"
-  exit 1
 fi
+printf 'RESULT: FAIL (%d/%d)\n' "$passed" "$total"
+exit 1

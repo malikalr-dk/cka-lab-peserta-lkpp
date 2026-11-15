@@ -1,10 +1,10 @@
 # LAB-07 — Deployments: Rolling Update, Rollback, dan Self-Healing
 
-Tujuan: kelola `Deployment` `web` di `cka-lab07` (rolling update, rollback, self-healing). Bukti: strategi, image, revisi, dan pod pengganti.
+Tujuan: kelola `Deployment` `web` di `gisp-app` (rolling update, rollback, self-healing). Bukti: strategi, image, revisi, dan pod pengganti.
 
 ## Konteks & State Awal
 
-- Starter sudah bikin namespace `cka-lab07` dengan satu `Deployment` `web` (dari `starter/deployment.yaml`):
+- Starter sudah bikin namespace `gisp-app` dengan satu `Deployment` `web` (dari `starter/deployment.yaml`):
   - Image: `nginx:1.27-alpine` (`imagePullPolicy: IfNotPresent`)
   - Replicas: `3`
 - Image `nginx:1.27-alpine` dan `nginx:1.29-alpine` sudah ada di cache `containerd` semua node (tanpa internet).
@@ -12,11 +12,11 @@ Tujuan: kelola `Deployment` `web` di `cka-lab07` (rolling update, rollback, self
 ## Tugas
 
 1. **Periksa state awal:**
-   - Cek `Deployment` `web` dan pod yang jalan di `cka-lab07`.
+   - Cek `Deployment` `web` dan pod yang jalan di `gisp-app`.
    - Catat image awal (`nginx:1.27-alpine`) plus nama dan `UID` satu pod yang aktif.
 
 2. **Set strategi rolling update:**
-   - Perbarui spesifikasi `Deployment` `web` di `cka-lab07` agar memakai strategi `RollingUpdate` dengan:
+   - Perbarui spesifikasi `Deployment` `web` di `gisp-app` agar memakai strategi `RollingUpdate` dengan:
      - `strategy.rollingUpdate.maxUnavailable: 1`
      - `strategy.rollingUpdate.maxSurge: 1`
 
@@ -30,5 +30,5 @@ Tujuan: kelola `Deployment` `web` di `cka-lab07` (rolling update, rollback, self
    - Tunggu rollout selesai; pastikan image di `Deployment` `web` kembali `nginx:1.27-alpine`.
 
 5. **Buktikan self-healing:**
-   - Hapus satu pod milik `Deployment` `web` di `cka-lab07`.
+   - Hapus satu pod milik `Deployment` `web` di `gisp-app`.
    - Amati ReplicaSet `web` bikin pod pengganti (nama dan `creationTimestamp` baru, *owner reference* ReplicaSet sama) sampai ada `3` pod `Running`.

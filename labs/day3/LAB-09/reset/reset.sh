@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# LAB-09 reset: back to the starter state — namespace cka-lab09 recreated with only the
+# LAB-09 reset: back to the starter state — namespace gisp-app recreated with only the
 # Deployment demo and the client pod; every Service created during the lab is gone.
 set -uo pipefail
 
@@ -7,7 +7,7 @@ if [[ -z "${KUBECONFIG:-}" ]]; then
   export KUBECONFIG=/root/.kube/config
 fi
 
-NS="cka-lab09"
+NS="gisp-app"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || true)"
 STARTER_SETUP="${SCRIPT_DIR}/../starter/setup.sh"
 # `ssh … 'bash -s' < reset.sh` (the documented remote runner) makes BASH_SOURCE /dev/stdin, so

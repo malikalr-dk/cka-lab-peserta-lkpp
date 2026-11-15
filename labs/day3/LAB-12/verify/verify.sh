@@ -8,7 +8,7 @@ if [[ -z "${KUBECONFIG:-}" ]]; then
   printf 'INFO: KUBECONFIG not set; falling back to %s\n' "$KUBECONFIG"
 fi
 
-NS="cka-lab12"
+NS="gisp-app"
 
 passed=0
 total=0
@@ -24,7 +24,7 @@ fail() {
   printf 'FAIL: %s\n' "$*"
 }
 
-# 1. ConfigMap 'app-config' exists in cka-lab12 with GREETING=halo-lab12
+# 1. ConfigMap 'app-config' exists in gisp-app with GREETING=halo-lab12
 cm_val="$(kubectl -n "$NS" get configmap app-config -o jsonpath='{.data.GREETING}' 2>/dev/null || true)"
 if [[ "$cm_val" == "halo-lab12" ]]; then
   pass "ConfigMap '${NS}/app-config' has data.GREETING='${cm_val}' (expected: 'halo-lab12')"
@@ -32,7 +32,7 @@ else
   fail "ConfigMap '${NS}/app-config' has data.GREETING='${cm_val:-missing}' (expected: 'halo-lab12')"
 fi
 
-# 2. PVC 'portal-data' exists in cka-lab12, storageClassName=local-path, status=Bound
+# 2. PVC 'portal-data' exists in gisp-app, storageClassName=local-path, status=Bound
 pvc_phase="$(kubectl -n "$NS" get pvc portal-data -o jsonpath='{.status.phase}' 2>/dev/null || true)"
 pvc_sc="$(kubectl -n "$NS" get pvc portal-data -o jsonpath='{.spec.storageClassName}' 2>/dev/null || true)"
 pvc_req="$(kubectl -n "$NS" get pvc portal-data -o jsonpath='{.spec.resources.requests.storage}' 2>/dev/null || true)"

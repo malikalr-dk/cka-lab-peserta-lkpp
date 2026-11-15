@@ -8,7 +8,7 @@ if [[ -z "${KUBECONFIG:-}" ]]; then
   printf 'INFO: KUBECONFIG not set; falling back to %s\n' "$KUBECONFIG"
 fi
 
-NS="cka-lab07"
+NS="gisp-app"
 DEPLOY="web"
 
 passed=0
@@ -25,7 +25,7 @@ fail() {
   printf 'FAIL: %s\n' "$*"
 }
 
-# 1. Deployment 'web' exists in cka-lab07
+# 1. Deployment 'web' exists in gisp-app
 if kubectl -n "$NS" get deployment "$DEPLOY" >/dev/null 2>&1; then
   pass "Deployment '${NS}/${DEPLOY}' exists (expected: present)"
 else

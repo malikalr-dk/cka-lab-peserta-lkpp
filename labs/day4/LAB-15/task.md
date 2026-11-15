@@ -7,7 +7,7 @@ Cakupan domain CKA: Troubleshooting (30%), Services & Networking (20%).
 ## Konteks & State Awal
 
 - Cluster `cka-pN` sudah punya Traefik sebagai Ingress controller di NodePort `30081` dan StorageClass `local-path`.
-- Namespace `cka-lab15` sudah berisi aplikasi `portal` yang tidak bisa diakses. Ada dua gangguan yang tidak saling bergantung.
+- Namespace `gisp-app` sudah berisi aplikasi `portal` yang tidak bisa diakses. Ada dua gangguan yang tidak saling bergantung.
 - Pemeriksaan cepat: `curl -H 'Host: portal.lab.local' http://localhost:30081/` gagal, padahal Pod-nya `Running`.
 
 ## Batasan
@@ -19,14 +19,14 @@ Cakupan domain CKA: Troubleshooting (30%), Services & Networking (20%).
 ## Tugas
 
 1. **Kumpulkan bukti kondisi awal:**
-   - `kubectl -n cka-lab15 get deploy,svc,ingress,pods -o wide`
-   - `kubectl -n cka-lab15 describe svc portal`
-   - `kubectl -n cka-lab15 describe ingress portal-ingress`
+   - `kubectl -n gisp-app get deploy,svc,ingress,pods -o wide`
+   - `kubectl -n gisp-app describe svc portal`
+   - `kubectl -n gisp-app describe ingress portal-ingress`
    - `curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: portal.lab.local' http://localhost:30081/`
 
 2. **Cari gangguan pertama (lapisan Service):**
-   - Bandingkan label Pod dengan selector Service. `kubectl -n cka-lab15 get pods --show-labels`.
-   - Perbaiki supaya Service memilih Pod yang benar. Bukti: `kubectl -n cka-lab15 get endpoints portal` menampilkan dua alamat.
+   - Bandingkan label Pod dengan selector Service. `kubectl -n gisp-app get pods --show-labels`.
+   - Perbaiki supaya Service memilih Pod yang benar. Bukti: `kubectl -n gisp-app get endpoints portal` menampilkan dua alamat.
 
 3. **Cari gangguan kedua (lapisan Ingress):**
    - Periksa backend yang dirujuk `portal-ingress` dan bandingkan dengan Service yang benar-benar ada.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# LAB-10 reset: delete both Ingresses in cka-lab10 and re-apply the starter manifests (including the broken Ingress).
+# LAB-10 reset: delete both Ingresses in gisp-app and re-apply the starter manifests (including the broken Ingress).
 # Leave Traefik installed in namespace 'traefik' — removing and reinstalling it would make reruns slow
 # andLAB-12 also relies on Traefik on NodePort 30081.
 set -uo pipefail
@@ -8,7 +8,7 @@ if [[ -z "${KUBECONFIG:-}" ]]; then
   export KUBECONFIG=/root/.kube/config
 fi
 
-NS="cka-lab10"
+NS="gisp-app"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 STARTER_YAML="${SCRIPT_DIR}/../starter/manifests.yaml"
 
@@ -25,7 +25,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: app
-  namespace: cka-lab10
+  namespace: gisp-app
   labels:
     app: app
 spec:
@@ -49,7 +49,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: app
-  namespace: cka-lab10
+  namespace: gisp-app
   labels:
     app: app
 spec:
@@ -65,7 +65,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: broken-ingress
-  namespace: cka-lab10
+  namespace: gisp-app
 spec:
   ingressClassName: traefik
   rules:

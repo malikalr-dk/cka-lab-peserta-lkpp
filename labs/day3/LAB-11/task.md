@@ -4,23 +4,23 @@ Tujuan: provisi PVC `local-path`, bukti data hidup `writer`→`reader`, set recl
 
 ## Konteks & State Awal
 
-- Starter sudah bikin namespace `cka-lab11` dan memastikan `StorageClass` `local-path` (provisioner dari `/opt/lab/manifests/local-path.yaml`) aktif.
+- Starter sudah bikin namespace `gisp-app` dan memastikan `StorageClass` `local-path` (provisioner dari `/opt/lab/manifests/local-path.yaml`) aktif.
 - `StorageClass` `local-path` memakai `volumeBindingMode: WaitForFirstConsumer`; PVC baru `Pending` sampai ada pod yang memakainya.
 - Setiap pod pakai `imagePullPolicy: IfNotPresent` (`busybox:1.37` atau `nginx:1.27-alpine` sudah di cache lokal).
 
 ## Tugas
 
 1. **Buat PersistentVolumeClaim (`data`):**
-   - Di `cka-lab11`, buat `PersistentVolumeClaim` `data` dengan:
+   - Di `gisp-app`, buat `PersistentVolumeClaim` `data` dengan:
      - `storageClassName: local-path`
      - `accessModes`: `ReadWriteOnce`
      - `resources.requests.storage`: `1Gi`
    - Setelah pod konsumen jalan (langkah 2), pastikan PVC `data` `Bound` dan catat nama `PersistentVolume` (`PV`, awalan `pvc-...`) yang ter-provisi.
 
 2. **Buktikan persistensi data (`writer` → `reader`):**
-   - Buat pod `writer` di `cka-lab11` yang mount PVC `data` ke `/data`, lalu tulis string `hello-cka` ke `/data/proof.txt`.
+   - Buat pod `writer` di `gisp-app` yang mount PVC `data` ke `/data`, lalu tulis string `hello-cka` ke `/data/proof.txt`.
    - Setelah file tertulis, hapus pod `writer`.
-   - Buat pod `reader` di `cka-lab11` yang mount PVC `data` yang sama ke `/data`; biarkan `Running`.
+   - Buat pod `reader` di `gisp-app` yang mount PVC `data` yang sama ke `/data`; biarkan `Running`.
    - Buktikan `/data/proof.txt` di dalam `reader` masih ada dan berisi `hello-cka`.
 
 3. **Reclaim policy (`Retain`) & jawaban dokumentasi:**

@@ -70,10 +70,10 @@ if [[ ! "$PORT" =~ ^[0-9]+$ ]] || [[ "$PORT" -lt 1 ]] || [[ "$PORT" -gt 65535 ]]
 fi
 [[ "$APP_PATH" == /* ]] || APP_PATH="/$APP_PATH"
 
-# --- image cache preflight (read-only, never pulls) ---------------------------------------
-# The node has no registry access during class, so an image that is not already in the CRI
-# cache becomes ImagePullBackOff in front of the participant. `crictl images` is a read-only
-# listing and this starter is trainer-side; the participant path stays pure kubectl.
+# --- image cache preflight (informational) ------------------------------------------------
+# Default images ship inside the golden image; BYO images are pulled by the node on first pod
+# create. `crictl images` is a read-only listing and this starter is trainer-side; the
+# participant path stays pure kubectl.
 if command -v crictl >/dev/null 2>&1; then
   cri_images="$(crictl images 2>/dev/null || true)"
   img_in_cache() {
@@ -91,11 +91,7 @@ if command -v crictl >/dev/null 2>&1; then
       printf 'INFO: image present in node cache: %s\n' "$ref"
       continue
     fi
-    if [[ "$ref" == "busybox:1.37" || "$IMAGE" == "$DEF_IMAGE" ]]; then
-      printf 'FAIL: image %s is not in the node CRI cache (expected: imported by the trainer the day before class, see docs/lab-images.md; this starter never pulls)\n' "$ref" >&2
-      exit 1
-    fi
-    printf 'WARN: BYO image %s not matched in the node CRI cache (expected: imported by the trainer; continuing because the cache name may differ from the declared ref)\n' "$ref" >&2
+    printf 'WARN: image %s belum ada di cache node; node akan menariknya saat pod dibuat (lihat docs/lab-images.md)\n' "$ref" >&2
   done
 else
   printf 'WARN: crictl not found; skipping the image cache preflight\n' >&2
@@ -222,7 +218,7 @@ printf 'INFO: waiting up to 120s for Deployment %s/demo rollout...\n' "$NS"
 if ! kubectl -n "$NS" rollout status deployment/demo --timeout=120s; then
   printf 'FAIL: Deployment %s/demo did not become ready\n' "$NS" >&2
   kubectl -n "$NS" get pods -o wide 2>/dev/null || true
-  printf 'HINT: ImagePullBackOff means the image is not in the node cache yet — the trainer imports it the day before class (lab-images.md).\n' >&2
+  printf 'HINT: ImagePullBackOff means the node cannot reach the image registry. Check the reference with the trainer (lab-images.md).\n' >&2
   exit 1
 fi
 

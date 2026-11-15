@@ -63,6 +63,7 @@ Empat lab terakhir tidak masuk jam kelas. Kerjakan di luar sesi, sendiri atau be
 | LAB-18 | HPA dengan metrics-server: scale-out dan scale-in |
 | LAB-19 | Gateway API: GatewayClass, Gateway, HTTPRoute |
 | LAB-20 | CRD dan operator: validasi skema, rekonsiliasi |
+| LAB-21 | Kustomize: base + overlay `dev`/`prod`, `kubectl apply -k` |
 
 LAB-19 dan LAB-20 memakai satu rilis Traefik dengan NodePort berbeda. Kerjakan berurutan, dan minta
 trainer menyiapkan ulang state lab yang lebih dulu kalau kamu mau mengulang.

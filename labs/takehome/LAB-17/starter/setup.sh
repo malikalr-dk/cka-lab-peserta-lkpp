@@ -160,7 +160,7 @@ ready_demo="$(kubectl -n "$NS" get deployment demo -o jsonpath='{.status.readyRe
 ready_client="$(kubectl -n "$NS" get deployment client -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
 intruder_phase="$(kubectl -n "$NS" get pod intruder -o jsonpath='{.status.phase}' 2>/dev/null || true)"
 if [[ "${ready_demo:-0}" -lt 1 || "${ready_client:-0}" -lt 1 || "${intruder_phase:-}" != "Running" ]]; then
-  printf 'FAIL: starter workloads not Ready in %s (demo=%s client=%s intruder=%s) — image %s belum ada di cache node, atau aplikasi tidak menjawab %s di port %s\n' \
+  printf 'FAIL: starter workloads not Ready in %s (demo=%s client=%s intruder=%s) — referensi image %s tidak bisa dijangkau node, atau aplikasi tidak menjawab %s di port %s\n' \
     "$NS" "${ready_demo:-0}" "${ready_client:-0}" "${intruder_phase:-missing}" \
     "$IMAGE" "$PROBE_PATH" "$PORT" >&2
   kubectl -n "$NS" get pods -o wide >&2 || true

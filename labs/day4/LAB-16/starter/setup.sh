@@ -147,16 +147,20 @@ spec:
                   number: 8080
 EOF
 
-printf 'INFO: menunggu PVC %s/portal-data Bound (maks 120s)...\n' "$NS"
+# PVC local-path memakai WaitForFirstConsumer: tetap Pending sampai ada Pod yang memakainya.
+# Jadi cukup pastikan PVC-nya ada; binding terjadi saat peserta menaikkan replika Deployment.
 phase=""
-for _ in $(seq 1 40); do
+for _ in $(seq 1 20); do
   phase="$(kubectl -n "$NS" get pvc portal-data -o jsonpath='{.status.phase}' 2>/dev/null || true)"
-  [[ "$phase" == "Bound" ]] && break
-  sleep 3
+  [[ -n "$phase" ]] && break
+  sleep 2
 done
-if [[ "$phase" != "Bound" ]]; then
-  printf 'FAIL: PVC %s/portal-data tidak Bound (status=%s)\n' "$NS" "${phase:-missing}" >&2
+if [[ -z "$phase" ]]; then
+  printf 'FAIL: PVC %s/portal-data tidak terbentuk\n' "$NS" >&2
   exit 1
+fi
+if [[ "$phase" == "Pending" ]]; then
+  printf 'INFO: PVC %s/portal-data Pending (WaitForFirstConsumer, normal sebelum Deployment naik)\n' "$NS"
 fi
 
 printf 'READY: state awal LAB-16 di namespace %s (Deployment 0 replika, Ingress port 8080)\n' "$NS"

@@ -1,5 +1,4 @@
-# lab-hosts.ps1 — pasang alias nama cluster di laptop Windows ("ssh lab02").
-# Jalankan sekali, dari PowerShell sebagai Administrator:
+# lab-hosts.ps1 — sekali jalan: daftarkan lab02 -> 157.10.160.139 di hosts. PowerShell as Admin.
 #   powershell -ExecutionPolicy Bypass -File .\lab-hosts.ps1
 $ErrorActionPreference = "Stop"
 $Ip    = if ($env:LAB_IP)    { $env:LAB_IP }    else { "157.10.160.139" }

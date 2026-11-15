@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# lab-hosts.sh — pasang alias nama cluster di laptop peserta ("ssh lab04").
-# Jalankan sekali per laptop: bash lab-hosts.sh   (minta sudo)
+# lab-hosts.sh — sekali jalan: daftarkan lab04 -> 157.10.160.158 di /etc/hosts. Butuh sudo.
 set -euo pipefail
 IP="${LAB_IP:-157.10.160.158}"
 NAME="${LAB_NAME:-lab04}"

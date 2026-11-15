@@ -85,9 +85,8 @@ sesuai hari sebelum mengerjakan lab.
 
 ## Peta sesi
 
-`docs/session-lab-map.md` memetakan 16 sesi deck ke 18 lab; nomor lab sekarang sama dengan nomor
-sesi. Empat lab take-home (LAB-15..18) dikerjakan di luar jam kelas.
-`docs/cka-curriculum-map.md` memetakan setiap lab ke domain silabus CKA.
+`docs/peta-lab.md` memuat jadwal 16 sesi, lab yang dipakai tiap sesi, empat lab mandiri
+(LAB-15..18), dan cara menilai pekerjaan sendiri dengan `verify.sh`.
 
 ## kubectl dari laptop (opsional)
 

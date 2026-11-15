@@ -148,8 +148,8 @@ Syarat:
 2. **Port valid `1–65535`.** Starter menolak `port=` yang bukan angka atau di luar rentang dengan
    pesan `(expected: 1-65535)`.
 3. Aplikasi listen HTTP pada `port=` yang dideklarasikan; `Service` `demo` memakai port yang sama.
-4. **Image sudah di-import ke cache node H-1 oleh trainer:** node tidak punya akses registry saat
-   kelas, jadi import dilakukan sebelum kelas berjalan (prosedur di `docs/lab-images.md`).
+4. **Image bisa ditarik dari registry:** image default sudah ada di golden image, image BYO ditarik
+   saat pod pertama dibuat. Daftar image dan aturan tag ada di `docs/lab-images.md`.
 5. **Endpoint di `path=` harus membakar CPU.** Kalau `path=` menunjuk endpoint murah (mis. `/healthz`
    yang hanya mengembalikan `200 OK`), utilisasi tidak akan melewati `50%` walaupun 4 loop berjalan,
    dan assertion scale-out gagal. Pilih endpoint yang melakukan kerja nyata (query, render, hitung).

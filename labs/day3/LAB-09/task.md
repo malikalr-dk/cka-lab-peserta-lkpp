@@ -11,7 +11,7 @@ Tujuan: buat `Service` `ClusterIP` untuk `demo` di `cka-lab09`, isi endpoint. Bu
   - Pod klien `client`, image `busybox:1.37`, perintah `sleep 3600`, `imagePullPolicy: IfNotPresent`
 - Yang **belum** ada: `Service` untuk deployment itu. Itu tugasmu.
 - Aplikasi `podinfo` listen port `9898` dan punya `/healthz`, `/version`, `/metrics`.
-- Semua image sudah di cache `containerd` tiap node. Node lab tidak tarik dari registry publik; jangan hapus `imagePullPolicy: IfNotPresent` dan jangan pakai image yang belum di cache.
+- Image default sudah ada di golden image tiap node. Node menarik image lain saat pod pertama dibuat; biarkan `imagePullPolicy: IfNotPresent`.
 
 ## Tugas
 
@@ -47,7 +47,7 @@ Verifier **tidak** memeriksa nama image. Yang dinilai adalah perilaku di atas, j
 
 ## Bring your own image (BYO)
 
-Kalau mau pakai image internal sendiri mengganti `podinfo`, trainer harus siapkan image **sebelum kelas** (node lab tidak tarik dari registry publik). Setelah image masuk cache node, tulis deklarasi di control-plane pada `/root/lab/lab09-image.txt`, tepat tiga baris:
+Kalau mau pakai image internal sendiri mengganti `podinfo`, pastikan registry-nya bisa dijangkau dari node lab. Trainer menyiapkan akses itu sebelum kelas. Setelah itu tulis deklarasi di control-plane pada `/root/lab/lab09-image.txt`, tepat tiga baris:
 
 ```text
 image=<registry>/<nama>:<tag>
@@ -67,7 +67,7 @@ Aturan yang mengikat:
 
 - **Tag harus ter-pin, jangan `latest`.** `starter/setup.sh` menolak referensi tanpa tag atau `:latest`.
 - Aplikasi harus listen HTTP pada `port` yang dideklarasikan dan membalas `200` pada `path` yang dideklarasikan.
-- Image harus sudah di-import ke cache node **H-1 oleh trainer**, bukan saat kelas berjalan.
+- Image ditarik node saat pod pertama kali dibuat (`imagePullPolicy: IfNotPresent`).
 - Setelah file ditulis, jalankan ulang `bash starter/setup.sh` (idempotent, membaca deklarasi tersebut) atau ganti image Deployment secara manual: `kubectl -n cka-lab09 set image deployment/demo demo=<image>:<tag>`.
 - Kalau file itu tidak ada, verifier memakai default `docker.io/stefanprodan/podinfo:6.7.1`, port `9898`, path `/healthz`.
 - `Service` yang dibuat tetap memakai port dari deklarasi (default `9898`), bukan port lain.
@@ -79,5 +79,4 @@ Kalau image diubah tanpa menulis deklarasi, verifier tetap memakai default; `Ser
 - Tanpa Ingress, tanpa `NodePort`, tanpa `LoadBalancer`: cukup satu `Service` `ClusterIP` bernama `demo`.
 - Jangan ubah `Deployment` `demo` selain urusan image (BYO), dan jangan hapus pod klien `client`. Verifier memakainya untuk uji DNS/HTTP.
 - Jangan sentuh `kube-system`, konfigurasi CoreDNS, atau label/selector `app=demo`.
-- Jangan buat pod baru dengan image yang belum di cache node (berakhir `ImagePullBackOff`).
-- Tidak ada akses ke registry publik dari node lab.
+- Jangan memakai referensi image yang tidak bisa dijangkau dari node; pod akan berakhir `ImagePullBackOff`.

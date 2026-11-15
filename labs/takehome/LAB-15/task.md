@@ -47,6 +47,6 @@ Syarat:
 
 1. Tag ter-pin: tag `latest` ditolak oleh `starter/setup.sh`.
 2. Aplikasi listen HTTP di `port` dan menjawab status 2xx di `path`; `path` dipakai readiness probe, jadi `Deployment demo` hanya jadi `Ready` kalau aplikasi benar-benar melayani jalur itu.
-3. Image sudah di-import trainer ke cache node pada H-1; node peserta tidak menarik image dari registry saat kelas.
+3. Image ditarik node saat pod pertama kali dibuat. Untuk registry internal, trainer menyiapkan aksesnya sebelum kelas.
 
 Tanpa file tersebut, lab memakai default `docker.io/stefanprodan/podinfo:6.7.1`, port `9898`, path `/healthz`. Verifier membaca file yang sama untuk port dan path, dan **tidak** memeriksa nama image: yang dinilai hanya perilaku (klien berlabel `role=client` lolos di port yang dideklarasikan, sementara `role=intruder` dan port lain tetap terblokir).

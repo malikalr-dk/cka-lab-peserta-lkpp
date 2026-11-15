@@ -1,24 +1,21 @@
 # Expected Result — LAB-01
 
-`verify/verify.sh` menilai state akhir di node `cka-pN-cp`:
+`verify/verify.sh` menilai state akhir di node `cka-pN-cp`. Satu Pod saja yang berjalan.
 
 1. **Namespace `gisp-app`:**
    - Namespace `gisp-app` ada di kluster dan memiliki fase `Active`.
 
-2. **Pod imperatif `web` (`nginx:1.27-alpine`):**
-   - Pod `web` di namespace `gisp-app` berstatus `Running` (kontainer siap) dan menjalankan image `nginx:1.27-alpine`.
+2. **Spec Pod `web` sudah `nginx:1.29-alpine`:**
+   - Pod `web` berstatus `Running` dan `spec.containers[0].image` = `nginx:1.29-alpine`, hasil `kubectl set image pod/web web=nginx:1.29-alpine`.
 
-3. **Pod deklaratif `web2` (`nginx:1.29-alpine`):**
-   - Pod `web2` di namespace `gisp-app` berstatus `Running` (kontainer siap) dan menjalankan image `nginx:1.29-alpine`.
+3. **Image yang dipakai container juga 1.29:**
+   - `status.containerStatuses[0].image` = `nginx:1.29-alpine`, jadi kubelet benar-benar memakai image baru, bukan hanya mengubah spec.
 
-4. **Manifest generate client-side (`/root/lab/lab01-pod.yaml`):**
-   - File `/root/lab/lab01-pod.yaml` ada di disk, merepresentasikan objek `Pod/web2`, dan perintah `kubectl -n gisp-app apply --dry-run=server -f /root/lab/lab01-pod.yaml` selesai dengan kode keluar `0`.
+4. **Versi nginx di dalam container:**
+   - `kubectl -n gisp-app exec web -- nginx -v` melaporkan `1.29.x`.
 
-5. **Bukti HTTP dan versi nginx di `web2`:**
-   - Eksekusi `kubectl -n gisp-app exec web2 -- wget -qO- http://127.0.0.1/` dan `kubectl -n gisp-app exec web2 -- nginx -v` berhasil dan melaporkan versi `1.29.x`.
+5. **File laporan `/root/lab/lab01-report.txt`:**
+   - Berisi `web_image_before=nginx:1.27-alpine` dan `web_image_after=nginx:1.29-alpine`.
 
-6. **File laporan `/root/lab/lab01-report.txt`:**
-   - File `/root/lab/lab01-report.txt` tersedia, memiliki kunci `web_image=nginx:1.27-alpine` dan `web2_served=<versi>` yang keduanya tidak kosong, serta nilai `web2_served` cocok dengan versi `1.29`.
-
-7. **Output verifier:**
-   - Menjalankan `verify/verify.sh` mencetak 6 baris `PASS:` dan diakhiri dengan `RESULT: PASS (6/6)` serta kode keluar `0`.
+6. **Output verifier:**
+   - Menjalankan `verify/verify.sh` mencetak 5 baris `PASS:` dan diakhiri `RESULT: PASS (5/5)` dengan kode keluar `0`.

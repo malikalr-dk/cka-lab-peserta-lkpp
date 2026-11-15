@@ -76,12 +76,11 @@ Berkas cetak ada di `docs/workbook/`:
 
 | Berkas | Isi |
 |---|---|
-| `workbook-cka-lkpp-fillable.pdf` | Workbook peserta (Dokumen 10) — isi latihan per sesi |
-| `erratum-day1.pdf` | Lembar koreksi hari 1 (1 hlm) |
-| `erratum-day2-4.pdf` | Lembar koreksi hari 2–4 (3 hlm) |
+| `workbook-cka-lkpp-fillable.pdf` | Workbook peserta (Dokumen 10) — latihan per sesi |
+| `erratum-peserta.pdf` | Lembar koreksi 1 halaman untuk Day 1–4 |
 
-Bagian lab yang berbeda dari workbook ada di lembar erratum, bukan di workbook. Baca erratum
-sesuai hari sebelum mengerjakan lab.
+Bagian lab yang berbeda dari workbook ada di lembar koreksi, bukan di workbook. Baca sekali
+sebelum sesi pertama, lalu cek lagi di hari yang lab-nya disebut.
 
 ## Peta sesi
 

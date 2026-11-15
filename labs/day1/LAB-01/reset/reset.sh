@@ -14,12 +14,16 @@ STARTER_SCRIPT="${SCRIPT_DIR}/../starter/setup.sh"
 
 printf 'INFO: deleting namespace %s if present...\n' "$NS"
 kubectl delete namespace "$NS" --ignore-not-found --wait=false >/dev/null 2>&1 || true
-for _ in $(seq 1 30); do
+for _ in $(seq 1 60); do
   if ! kubectl get namespace "$NS" >/dev/null 2>&1; then
     break
   fi
   sleep 2
 done
+if kubectl get namespace "$NS" >/dev/null 2>&1; then
+  printf 'FAIL: namespace %s masih ada setelah 120 detik, reset belum bersih\n' "$NS"
+  exit 1
+fi
 
 rm -f "${LAB_DIR}/lab01-pod.yaml" "${LAB_DIR}/lab01-report.txt"
 

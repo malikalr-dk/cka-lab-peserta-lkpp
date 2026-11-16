@@ -20,8 +20,9 @@ Tujuan: reset lalu `kubeadm init` dan kubeconfig root. Bukti: `/healthz` mengemb
 
 1. Sebelum membongkar kluster, periksa dan catat:
    - Nama node control-plane (`cka-pN-cp`, gunakan `hostname`).
-   - IP private control-plane (`<cp private ip>`, gunakan `hostname -I` atau `ip -4 addr`).
+   - IP private control-plane (`<cp private ip>`, gunakan `hostname -I` atau `ip -4 addr`). pake yang 10.*.*.*
    - IP publik / floating control-plane (`<cp floating ip>`, dapat dilihat di `/root/.kube/config` atau dari informasi sesi lab).
+        cat `/root/.kube/config`
 2. Bongkar instalasi control-plane yang ada dengan menjalankan:
    - `kubeadm reset -f`
    - Bersihkan sisa konfigurasi CNI (`find /etc/cni/net.d -mindepth 1 -delete`) dan data `/var/lib/etcd` bila masih tersisa. **Jangan menghapus direktori `/etc/cni/net.d` itu sendiri**: containerd 2.x akan mati dan `kubeadm init` gagal dengan `connection refused`.
@@ -30,7 +31,8 @@ Tujuan: reset lalu `kubeadm init` dan kubeconfig root. Bukti: `/healthz` mengemb
    - `--pod-network-cidr=192.168.0.0/16`
    - `--apiserver-advertise-address=<cp private ip>`
    - `--apiserver-cert-extra-sans=<cp floating ip>`
-   - `--node-name=cka-pN-cp` (sesuaikan `pN` dengan nomor pesertamu, mis. `cka-p1-cp`)
+   - `--node-name=cka-pN-cp` (sesuaikan `pN` dengan nomor pesertamu, mis. `cka-p1-cp`) 
+   - kubeadm init --pod-network-cidr=192.168.0.0/16 --apiserver-advertise-address=10.10.10.10 --apiserver-cert-extra-sans=150.10.10.10 --node-name=cka-p01-cp
 4. Siapkan kubeconfig untuk `root` di `/root/.kube/config` dengan menyalin `/etc/kubernetes/admin.conf`.
 5. Verifikasi bahwa:
    - `kubectl get --raw /healthz` mengembalikan `ok`.

@@ -4,6 +4,8 @@ Tujuan: inspeksi node, namespace, dan pod kube-system. Bukti: laporan di `/root/
 
 ## Konteks & State Awal
 
+- **Starter (opsional):** `bash starter/setup.sh` hanya membersihkan `/root/lab` dari percobaan sebelumnya; tanpa itu pun lab jalan.
+
 - Kluster 3-node (`cka-pN-cp`, `cka-pN-w1`, `cka-pN-w2`) sehat (`Ready`).
 - Lab ini **read-only** untuk objek Kubernetes: jangan hapus atau ubah node/pod sistem.
 - `kubectl` boleh dari laptopmu atau SSH ke `cka-pN-cp`; laporan akhir **wajib** di `cka-pN-cp` pada `/root/lab/lab02-report.txt`.

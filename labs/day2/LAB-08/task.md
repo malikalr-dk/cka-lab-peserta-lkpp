@@ -4,6 +4,8 @@ Tujuan: suntik `ConfigMap`/`Secret` ke pod (env dan volume) serta arahkan penjad
 
 ## Konteks & State Awal
 
+- **Starter (wajib):** `bash starter/setup.sh` membuat namespace `gisp-app` bersih dan memastikan `cka-pN-w2` belum bertaint, jadi baseline FAIL-nya jujur.
+
 - Starter sudah bikin namespace `gisp-app` dalam keadaan kosong.
 - Kluster punya dua worker: `cka-pN-w1` dan `cka-pN-w2` (ganti `pN` sesuai clustermu; cek `kubectl get nodes`).
 - Pakai image lokal di `containerd` (mis. `nginx:1.27-alpine` atau `busybox:1.37` dengan sleep) dan `imagePullPolicy: IfNotPresent`.

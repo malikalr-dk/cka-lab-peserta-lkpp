@@ -4,6 +4,8 @@ Tujuan: jalankan satu Pod, perbarui image-nya di tempat, dan buktikan versi baru
 
 ## Konteks & State Awal
 
+- **Starter (opsional):** `bash starter/setup.sh` hanya menyiapkan `/root/lab` dan nama namespace; lab tetap bisa dikerjakan tanpa itu.
+
 - Kerja dari node control-plane (`cka-pN-cp`) sebagai `root`.
 - Starter sudah siapkan direktori `/root/lab`; namespace `gisp-app` belum ada.
 - Tag image latihan: `nginx:1.27-alpine` dan `nginx:1.29-alpine`.

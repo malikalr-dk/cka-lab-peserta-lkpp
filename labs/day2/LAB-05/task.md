@@ -10,6 +10,8 @@ Tujuan: cordon/drain/uncordon w1; snapshot dan restore etcd ke scratch. Bukti: s
 
 ## Konteks & State Awal
 
+- **Starter (opsional):** `bash starter/setup.sh` melepas `cordon` di `cka-pN-w1` dan menghapus snapshot/PVC lama. Wajib kalau sesi sebelumnya sempat `drain`.
+
 - Kluster 3-node (`cka-pN-cp`, `cka-pN-w1`, `cka-pN-w2`) sehat (`Ready` dan *schedulable*).
 - Login sebagai `root` di node control-plane (`cka-pN-cp`).
 - Utilitas `kubectl`, `etcdctl`, dan `etcdutl` sudah ada di `PATH` pada `cka-pN-cp`.

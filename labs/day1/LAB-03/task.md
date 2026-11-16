@@ -12,6 +12,8 @@ Tujuan: reset lalu `kubeadm init` dan kubeconfig root. Bukti: `/healthz` mengemb
 
 ## Konteks & State Awal
 
+- **Starter (opsional):** `bash starter/setup.sh` hanya memeriksa `kubeadm`/`kubelet`/`kubectl`/`crictl` ada di node; tidak mengubah apa pun.
+
 - Login SSH sebagai `root` di node control-plane `cka-pN-cp`.
 - Paket `kubeadm`, `kubelet`, `kubectl` (**v1.37.2**) dan `containerd` sudah terpasang, dan seluruh image sistem control-plane sudah ter-cache secara lokal di namespace `k8s.io`.
 - Kluster awal masih berjalan; langkah pertama mem-bongkar kluster itu.

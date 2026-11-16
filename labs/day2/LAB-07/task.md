@@ -4,6 +4,8 @@ Tujuan: kelola `Deployment` `web` di `gisp-app` (rolling update, rollback, self-
 
 ## Konteks & State Awal
 
+- **Starter (wajib):** `bash starter/setup.sh` membuat namespace `gisp-app` + `Deployment` `web` (3 replika, `nginx:1.27-alpine`) yang jadi objek penilaian. Tanpa starter tidak ada yang bisa di-rollout.
+
 - Starter sudah bikin namespace `gisp-app` dengan satu `Deployment` `web` (dari `starter/deployment.yaml`):
   - Image: `nginx:1.27-alpine` (`imagePullPolicy: IfNotPresent`)
   - Replicas: `3`

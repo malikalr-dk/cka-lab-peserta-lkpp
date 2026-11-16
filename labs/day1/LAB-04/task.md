@@ -4,6 +4,8 @@ Tujuan: join worker, pasang Calico lokal, uji DNS cluster. Bukti: 3 node Ready d
 
 ## Konteks & State Awal
 
+- **Starter (opsional):** `bash starter/setup.sh` hanya memastikan control-plane hasil LAB-03 siap; tidak membuat kluster.
+
 - Node control-plane (`cka-pN-cp`) sudah berjalan dari **LAB-03**, namun belum memiliki plugin CNI.
 - Kedua node worker (`cka-pN-w1` dan `cka-pN-w2`) belum tergabung ke dalam kluster (atau masih membawa state kluster lama sebelum LAB-03 di-reset).
 - Manifest Calico **v3.33.0** tersedia secara lokal di `/opt/lab/manifests/calico.yaml` dan seluruh image Calico maupun `busybox:1.37` sudah di-cache di `containerd` (`k8s.io`) pada setiap node. Jangan mengunduh manifest atau image dari internet.

@@ -4,6 +4,8 @@ Tujuan: RBAC least-privilege di `gisp-app` plus list nodes. Bukti: `kubectl auth
 
 ## Konteks & State Awal
 
+- **Starter (wajib):** `bash starter/setup.sh` membuat ulang namespace `gisp-app` yang bersih dan menghapus `ClusterRole`/`ClusterRoleBinding` `dev-sa` sisa percobaan sebelumnya. Tanpa itu baseline bisa terbaca `PASS` duluan.
+
 - Starter sudah bikin namespace `gisp-app`.
 - Kerja dari laptop atau SSH ke `cka-pN-cp`.
 - **Penting:** Terapkan prinsip *least privilege*. Jangan pernah menggunakan *wildcard* (`*`) pada `verbs` maupun `resources`, dan jangan mengikat `cluster-admin` ke `ServiceAccount` ini.
